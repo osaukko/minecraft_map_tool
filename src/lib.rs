@@ -56,23 +56,19 @@ pub struct MapItem {
 
 impl MapItem {
     pub fn left(&self) -> i32 {
-        // TODO: This have been only tested for scale 0. Math for other scale values should be checked.
         self.center.0 - 64 * 2i32.pow(self.scale as u32)
     }
 
     pub fn top(&self) -> i32 {
-        // TODO: This have been only tested for scale 0. Math for other scale values should be checked.
         self.center.1 - 64 * 2i32.pow(self.scale as u32)
     }
 
     pub fn right(&self) -> i32 {
-        // TODO: This have been only tested for scale 0. Math for other scale values should be checked.
-        self.center.0 + 64 * 2i32.pow(self.scale as u32)
+        self.center.0 + 64 * 2i32.pow(self.scale as u32) - 1
     }
 
     pub fn bottom(&self) -> i32 {
-        // TODO: This have been only tested for scale 0. Math for other scale values should be checked.
-        self.center.1 + 64 * 2i32.pow(self.scale as u32)
+        self.center.1 + 64 * 2i32.pow(self.scale as u32) - 1
     }
 }
 

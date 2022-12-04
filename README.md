@@ -21,7 +21,7 @@ $ minecraft_map_tool -i /path/to/map/data/ image -- 0 -52 -1087 747 -788 title.p
 The program tells you how to use it if you ask for help from it.
 
 ```bash
-$ minecraft_map_tool help                                                                                                          
+$ minecraft_map_tool help
 This program tells information about map files and creates images from them
 
 Usage: minecraft_map_tool [OPTIONS] <COMMAND>

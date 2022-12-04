@@ -2,11 +2,14 @@ use clap::{Parser, Subcommand};
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, ContentArrangement, Table};
+use crossterm::style::{Color, Print, ResetColor, SetForegroundColor};
+use crossterm::ExecutableCommand;
 use image::RgbaImage;
 use minecraft_map_tool::error::{Error, Result};
 use minecraft_map_tool::MinecraftMapper;
 use minecraft_map_tool::SortingOrder::{SortByNaturalFilename, SortByTime};
 use std::fs;
+use std::io::stdout;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -155,18 +158,16 @@ fn make_image(cli: &Cli) -> Result<()> {
         filename,
     } = &cli.command
     {
-        if *scale != 0 {
-            return Err(Error::from(
-                "Currently only scale 0 is supported".to_string(),
-            ));
-        }
-
+        let scale_factor = 2i32.pow(*scale as u32);
         if left >= right || top >= bottom {
             return Err(Error::from("Invalid coordinates".to_string()));
         }
-
-        let image_width = (right - left + 1) as u32;
-        let image_height = (bottom - top + 1) as u32;
+        check_scaled_coordinate(*left, scale_factor, 0, "left")?;
+        check_scaled_coordinate(*top, scale_factor, 0, "top")?;
+        check_scaled_coordinate(*right, scale_factor, scale_factor - 1, "right")?;
+        check_scaled_coordinate(*bottom, scale_factor, scale_factor - 1, "bottom")?;
+        let image_width = ((right - left) / scale_factor + 1) as u32;
+        let image_height = ((bottom - top) / scale_factor + 1) as u32;
 
         println!("Output image size: {}×{}", image_width, image_height);
         let mut image = RgbaImage::new(image_width, image_height);
@@ -184,6 +185,7 @@ fn make_image(cli: &Cli) -> Result<()> {
             .map_err(|err| format!("Could not read maps: {}", err))?;
         for map in maps {
             if map.scale != *scale {
+                // Ignoring map, because different scaling
                 continue;
             }
             if map.left() <= *right
@@ -191,6 +193,7 @@ fn make_image(cli: &Cli) -> Result<()> {
                 && map.right() >= *left
                 && map.bottom() >= *top
             {
+                // Map overlaps the target image, paint it
                 println!(
                     "Adding {:?} [l: {}, t: {}, r: {}, b: {}]",
                     map.file.file_name().unwrap(),
@@ -200,7 +203,12 @@ fn make_image(cli: &Cli) -> Result<()> {
                     map.bottom()
                 );
                 let map_image = minecraft_mapper.make_image(&map)?;
-                paint_image(&map_image, &mut image, map.left() - left, map.top() - top);
+                paint_image(
+                    &map_image,
+                    &mut image,
+                    (map.left() - left) / scale_factor as i32,
+                    (map.top() - top) / scale_factor as i32,
+                );
             }
         }
 
@@ -237,4 +245,33 @@ fn paint_image(source: &RgbaImage, target: &mut RgbaImage, x: i32, y: i32) {
             target.put_pixel(out_x as u32, out_y as u32, *pixel);
         }
     }
+}
+
+fn check_scaled_coordinate(
+    value: i32,
+    scale_factor: i32,
+    expected_remainder: i32,
+    name: &str,
+) -> Result<()> {
+    let euclid_remainder = value.rem_euclid(scale_factor);
+    let remainder = value % scale_factor;
+    let minus_value = expected_remainder - scale_factor - remainder;
+    let plus_value = scale_factor + minus_value;
+    if euclid_remainder != expected_remainder {
+        let message = format!(
+            concat!(
+                "The {} coordinate is not on the edge of the pixel boundary, which may give ",
+                "unexpected results. Try to change it to {} or {}.\n"
+            ),
+            name,
+            value + minus_value,
+            value + plus_value
+        );
+        stdout()
+            .execute(SetForegroundColor(Color::Yellow))?
+            .execute(Print("Warning: "))?
+            .execute(ResetColor)?
+            .execute(Print(message))?;
+    }
+    Ok(())
 }
