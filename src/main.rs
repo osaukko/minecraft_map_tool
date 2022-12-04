@@ -5,6 +5,7 @@ use comfy_table::{Cell, ContentArrangement, Table};
 use image::RgbaImage;
 use minecraft_map_tool::error::{Error, Result};
 use minecraft_map_tool::MinecraftMapper;
+use minecraft_map_tool::SortingOrder::{SortByNaturalFilename, SortByTime};
 use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -33,6 +34,10 @@ enum Commands {
 
     /// Create one image from multiple maps
     Image {
+        /// Draw images in number order (default is from oldest to newest)
+        #[arg(short, long)]
+        number_order: bool,
+
         /// Use maps with scale (Map zoom level)
         scale: i8,
 
@@ -81,7 +86,7 @@ fn main() -> ExitCode {
 
 fn list_maps(cli: &Cli) -> Result<()> {
     let minecraft_mapper = MinecraftMapper::new();
-    let maps = minecraft_mapper.read_maps(&cli.input_dir)?;
+    let maps = minecraft_mapper.read_maps(&cli.input_dir, SortByNaturalFilename)?;
     let mut table = Table::new();
     table
         .load_preset(UTF8_FULL)
@@ -118,7 +123,7 @@ fn list_maps(cli: &Cli) -> Result<()> {
 fn make_images(cli: &Cli) -> Result<()> {
     let minecraft_mapper = MinecraftMapper::new();
     let maps = minecraft_mapper
-        .read_maps(&cli.input_dir)
+        .read_maps(&cli.input_dir, SortByNaturalFilename)
         .map_err(|err| format!("Could not read maps: {}", err))?;
     ensure_output_dir(cli)?;
     for map in maps {
@@ -141,6 +146,7 @@ fn make_images(cli: &Cli) -> Result<()> {
 
 fn make_image(cli: &Cli) -> Result<()> {
     if let Commands::Image {
+        number_order,
         scale,
         left,
         top,
@@ -167,7 +173,14 @@ fn make_image(cli: &Cli) -> Result<()> {
 
         let minecraft_mapper = MinecraftMapper::new();
         let maps = minecraft_mapper
-            .read_maps(&cli.input_dir)
+            .read_maps(
+                &cli.input_dir,
+                if *number_order {
+                    SortByNaturalFilename
+                } else {
+                    SortByTime
+                },
+            )
             .map_err(|err| format!("Could not read maps: {}", err))?;
         for map in maps {
             if map.scale != *scale {

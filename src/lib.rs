@@ -10,6 +10,28 @@ use valence_nbt::{from_binary_slice, Value};
 pub mod error;
 pub mod palette;
 
+// Sorting order for map files
+#[derive(Debug)]
+pub enum SortingOrder {
+    SortByTime,
+    SortByNaturalFilename,
+}
+
+impl SortingOrder {
+    fn sorting_method(&self, a: &Path, b: &Path) -> std::cmp::Ordering {
+        match self {
+            SortingOrder::SortByTime => {
+                let a_modified = &a.metadata().unwrap().modified().unwrap();
+                let b_modified = &b.metadata().unwrap().modified().unwrap();
+                a_modified.cmp(b_modified)
+            }
+            SortingOrder::SortByNaturalFilename => {
+                natord::compare(&a.display().to_string(), &b.display().to_string())
+            }
+        }
+    }
+}
+
 /// Some of the data available from map_<#>.dat files
 #[derive(Debug)]
 pub struct MapItem {
@@ -81,7 +103,7 @@ impl MinecraftMapper {
         Ok(image)
     }
 
-    pub fn read_maps(&self, path: &Path) -> Result<Vec<MapItem>> {
+    pub fn read_maps(&self, path: &Path, sort: SortingOrder) -> Result<Vec<MapItem>> {
         // Make human sorted list of map files
         let mut map_files = Vec::new();
         for entry in (path.read_dir()?).flatten() {
@@ -97,8 +119,7 @@ impl MinecraftMapper {
                 map_files.push(entry.path());
             }
         }
-        map_files
-            .sort_by(|a, b| natord::compare(&a.display().to_string(), &b.display().to_string()));
+        map_files.sort_by(|a, b| sort.sorting_method(a, b));
 
         // Load map items
         let mut maps = Vec::new();
