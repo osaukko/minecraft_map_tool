@@ -1,11 +1,16 @@
 use crate::error::Result;
 use crate::versions::MINECRAFT_VERSIONS;
+use clap::ValueEnum;
 use fastnbt::ByteArray;
 use flate2::read::GzDecoder;
 use serde::Deserialize;
-use std::fs;
-use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::cmp::Ordering;
+use std::collections::VecDeque;
+use std::{
+    fs,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 pub mod error;
 pub mod palette;
@@ -39,7 +44,7 @@ impl std::fmt::Display for BannerColor {
     }
 }
 
-/// For deserializing banner name
+/// For deserializing banner name from JSON
 #[derive(Debug, Deserialize)]
 struct BannerName {
     text: String,
@@ -127,6 +132,9 @@ impl MapData {
     /// Pretty dimension
     ///
     /// Returns `Overworld` instead of `minecraft:overworld`
+    ///
+    /// TODO: Change to figure out dimension from the file path,
+    ///       it seems that the dimension is always "Overworld"
     pub fn pretty_dimension(&self) -> String {
         match self.dimension.find(':') {
             None => self.dimension.clone(),
@@ -251,4 +259,127 @@ pub struct Pos {
 
     /// The z-position
     pub z: i32,
+}
+
+#[derive(Debug)]
+pub struct ReadMap {
+    map_files: VecDeque<PathBuf>,
+}
+
+impl ReadMap {
+    /// Attempts to find a common base path for all map items
+    pub fn common_base_path(&self) -> Option<PathBuf> {
+        if self.map_files.is_empty() {
+            return None;
+        }
+        let mut iter = self.map_files.iter();
+        let mut base = iter.next().unwrap().clone();
+        for path in iter {
+            let mut new_base = PathBuf::new();
+            let a_components = base.components();
+            let b_components = path.components();
+            let zipped = a_components.zip(b_components);
+            for (a, b) in zipped {
+                if a == b {
+                    new_base.push(a)
+                }
+            }
+            base = new_base;
+        }
+        Some(base)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map_files.is_empty()
+    }
+}
+
+impl Iterator for ReadMap {
+    type Item = Result<MapItem>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.map_files
+            .pop_front()
+            .map(|path| MapItem::read_from(&path))
+    }
+}
+
+pub fn read_maps(path: &Path, sort: &SortingOrder, recursive: bool) -> Result<ReadMap> {
+    let mut directory_stack = VecDeque::new();
+    let mut map_files = VecDeque::new();
+    directory_stack.push_back(PathBuf::from(path));
+    while !directory_stack.is_empty() {
+        let dir = directory_stack.pop_front().unwrap();
+        let read_dir = match dir.read_dir() {
+            Ok(read_dir) => read_dir,
+            Err(err) => {
+                eprintln!("Warning: Could not read: {:?}, {}", dir, err);
+                continue;
+            }
+        };
+        for dir_entry in read_dir.flatten() {
+            let path = dir_entry.path();
+            if path.is_symlink() {
+                // We do not follow symlinks for now, could cause forever loop
+                continue;
+            } else if path.is_file()
+                && path.extension().unwrap_or_default() == "dat"
+                && path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_str()
+                    .unwrap_or_default()
+                    .starts_with("map_")
+            {
+                map_files.push_back(dir_entry.path());
+            } else if path.is_dir() && recursive {
+                directory_stack.push_back(dir_entry.path());
+            }
+        }
+    }
+    map_files.make_contiguous().sort_by(|a, b| sort.cmp(a, b));
+    Ok(ReadMap { map_files })
+}
+
+/// Sorting order for map files
+#[derive(Clone, Debug, ValueEnum)]
+pub enum SortingOrder {
+    /// Files are organized by name and numbers in the natural order
+    Name,
+
+    /// Files are organized from oldest to newest
+    Time,
+}
+
+impl SortingOrder {
+    /// This method returns an Ordering between *a* and *b* path based on *self* value.
+    ///
+    /// # Example
+    /// ```rust
+    /// use minecraft_map_tool::SortingOrder;
+    /// let sorter = SortingOrder::Name;
+    /// map_files.sort_by(|a, b| sorter.cmp(a, b));
+    /// ```
+    pub fn cmp(&self, a: &Path, b: &Path) -> Ordering {
+        match self {
+            SortingOrder::Name => {
+                let a_str = a.as_os_str().to_str().expect("invalid path");
+                let b_str = b.as_os_str().to_str().expect("invalid path");
+                natord::compare(a_str, b_str)
+            }
+            SortingOrder::Time => {
+                let a_modified = &a
+                    .metadata()
+                    .expect("could not read metadata")
+                    .modified()
+                    .expect("could not get modification time");
+                let b_modified = &b
+                    .metadata()
+                    .expect("could not read metadata")
+                    .modified()
+                    .expect("could not get modification time");
+                a_modified.cmp(b_modified)
+            }
+        }
+    }
 }

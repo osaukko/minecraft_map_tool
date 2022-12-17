@@ -1,16 +1,13 @@
 use clap::Args;
-use comfy_table::presets::NOTHING;
-use comfy_table::CellAlignment::{Left, Right};
-use comfy_table::ContentArrangement::DynamicFullWidth;
-use comfy_table::TableComponent::{HeaderLines, VerticalLines};
-use comfy_table::{Cell, Table};
+use comfy_table::{presets, Cell, CellAlignment, ContentArrangement, Table, TableComponent};
 use crossterm::queue;
 use crossterm::style::{Attribute, Print, SetAttribute};
 use minecraft_map_tool::MapItem;
-use std::cmp::max;
-use std::io::{stdout, Write};
-use std::path::PathBuf;
-use std::process::ExitCode;
+use std::{
+    io::{stdout, Write},
+    path::PathBuf,
+    process::ExitCode,
+};
 
 #[derive(Args, Debug)]
 pub struct InfoArgs {
@@ -18,7 +15,7 @@ pub struct InfoArgs {
     file: PathBuf,
 }
 
-pub fn show_info(args: InfoArgs) -> ExitCode {
+pub fn show_info(args: &InfoArgs) -> ExitCode {
     let map_item = match MapItem::read_from(&args.file) {
         Ok(map_item) => map_item,
         Err(err) => {
@@ -57,7 +54,7 @@ pub fn show_info(args: InfoArgs) -> ExitCode {
     // Finding maximum width and set it to all tables
     let mut width = 20; // Minimum width
     for frame in &frames {
-        width = max(width, frame.calculate_width())
+        width = std::cmp::max(width, frame.calculate_width())
     }
 
     // Printing frames
@@ -98,7 +95,8 @@ impl TextFrame<'_> {
         )
         .unwrap();
         self.content.set_width(width);
-        self.content.set_content_arrangement(DynamicFullWidth);
+        self.content
+            .set_content_arrangement(ContentArrangement::DynamicFullWidth);
         for line in self.content.lines() {
             queue!(
                 stdout(),
@@ -142,7 +140,7 @@ fn yes_or_no(byte: i8) -> String {
 
 fn make_basic_info_table(map_item: &MapItem) -> Table {
     let mut table = Table::new();
-    table.load_preset(NOTHING);
+    table.load_preset(presets::NOTHING);
     table.add_row(vec![
         "Scale".to_string(),
         map_item.data.scale.to_string(),
@@ -163,7 +161,7 @@ fn make_basic_info_table(map_item: &MapItem) -> Table {
 
 fn make_tracking_table(map_item: &MapItem) -> Table {
     let mut table = Table::new();
-    table.load_preset(NOTHING);
+    table.load_preset(presets::NOTHING);
     table.add_row(vec![
         "Tracking position".to_string(),
         yes_or_no(map_item.data.tracking_position),
@@ -177,24 +175,24 @@ fn make_tracking_table(map_item: &MapItem) -> Table {
 
 fn make_coordinate_table(map_item: &MapItem) -> Table {
     let mut table = Table::new();
-    table.load_preset(NOTHING);
+    table.load_preset(presets::NOTHING);
     table.add_row(vec![
-        "Upper Left".to_string(),
+        "Upper (CellAlignment::Left)".to_string(),
         map_item.data.left().to_string(),
         map_item.data.top().to_string(),
     ]);
     table.add_row(vec![
-        "Lower Left".to_string(),
+        "Lower (CellAlignment::Left)".to_string(),
         map_item.data.left().to_string(),
         map_item.data.bottom().to_string(),
     ]);
     table.add_row(vec![
-        "Upper Right".to_string(),
+        "Upper (CellAlignment::Right)".to_string(),
         map_item.data.right().to_string(),
         map_item.data.top().to_string(),
     ]);
     table.add_row(vec![
-        "Lower Right".to_string(),
+        "Lower (CellAlignment::Right)".to_string(),
         map_item.data.right().to_string(),
         map_item.data.bottom().to_string(),
     ]);
@@ -208,23 +206,23 @@ fn make_coordinate_table(map_item: &MapItem) -> Table {
 
 fn make_banners_table(map_item: &MapItem) -> Table {
     let mut table = Table::new();
-    table.load_preset(NOTHING);
-    table.set_style(HeaderLines, '╌');
-    table.set_style(VerticalLines, ' ');
+    table.load_preset(presets::NOTHING);
+    table.set_style(TableComponent::HeaderLines, '╌');
+    table.set_style(TableComponent::VerticalLines, ' ');
     table.set_header(vec![
-        Cell::new("Name").set_alignment(Left),
-        Cell::new("Color").set_alignment(Left),
-        Cell::new("X").set_alignment(Right),
-        Cell::new("Y").set_alignment(Right),
-        Cell::new("Z").set_alignment(Right),
+        Cell::new("Name").set_alignment(CellAlignment::Left),
+        Cell::new("Color").set_alignment(CellAlignment::Left),
+        Cell::new("X").set_alignment(CellAlignment::Right),
+        Cell::new("Y").set_alignment(CellAlignment::Right),
+        Cell::new("Z").set_alignment(CellAlignment::Right),
     ]);
     for banner in &map_item.data.banners {
         table.add_row(vec![
-            Cell::new(banner.extract_name()).set_alignment(Left),
-            Cell::new(banner.color.to_string()).set_alignment(Left),
-            Cell::new(banner.pos.x).set_alignment(Right),
-            Cell::new(banner.pos.y).set_alignment(Right),
-            Cell::new(banner.pos.z).set_alignment(Right),
+            Cell::new(banner.extract_name()).set_alignment(CellAlignment::Left),
+            Cell::new(banner.color.to_string()).set_alignment(CellAlignment::Left),
+            Cell::new(banner.pos.x).set_alignment(CellAlignment::Right),
+            Cell::new(banner.pos.y).set_alignment(CellAlignment::Right),
+            Cell::new(banner.pos.z).set_alignment(CellAlignment::Right),
         ]);
     }
     table
@@ -232,23 +230,23 @@ fn make_banners_table(map_item: &MapItem) -> Table {
 
 fn make_frames_table(map_item: &MapItem) -> Table {
     let mut table = Table::new();
-    table.load_preset(NOTHING);
-    table.set_style(HeaderLines, '╌');
-    table.set_style(VerticalLines, ' ');
+    table.load_preset(presets::NOTHING);
+    table.set_style(TableComponent::HeaderLines, '╌');
+    table.set_style(TableComponent::VerticalLines, ' ');
     table.set_header(vec![
-        Cell::new("Entity ID").set_alignment(Left),
-        Cell::new("Angle").set_alignment(Left),
-        Cell::new("X").set_alignment(Right),
-        Cell::new("Y").set_alignment(Right),
-        Cell::new("Z").set_alignment(Right),
+        Cell::new("Entity ID").set_alignment(CellAlignment::Left),
+        Cell::new("Angle").set_alignment(CellAlignment::Left),
+        Cell::new("X").set_alignment(CellAlignment::Right),
+        Cell::new("Y").set_alignment(CellAlignment::Right),
+        Cell::new("Z").set_alignment(CellAlignment::Right),
     ]);
     for frame in &map_item.data.frames {
         table.add_row(vec![
-            Cell::new(frame.entity_id).set_alignment(Left),
-            Cell::new(frame.rotation).set_alignment(Left),
-            Cell::new(frame.pos.x).set_alignment(Right),
-            Cell::new(frame.pos.y).set_alignment(Right),
-            Cell::new(frame.pos.z).set_alignment(Right),
+            Cell::new(frame.entity_id).set_alignment(CellAlignment::Left),
+            Cell::new(frame.rotation).set_alignment(CellAlignment::Left),
+            Cell::new(frame.pos.x).set_alignment(CellAlignment::Right),
+            Cell::new(frame.pos.y).set_alignment(CellAlignment::Right),
+            Cell::new(frame.pos.z).set_alignment(CellAlignment::Right),
         ]);
     }
     table

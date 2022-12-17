@@ -1,8 +1,8 @@
-use crate::info_tool::{show_info, InfoArgs};
 use clap::{Parser, Subcommand};
 use std::process::ExitCode;
 
 pub mod info_tool;
+pub mod list_tool;
 
 #[derive(Debug, Parser)]
 #[command(version, long_about = None)]
@@ -16,13 +16,21 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// Show information on map_#.dat file
-    Info(InfoArgs),
+    Info(info_tool::InfoArgs),
+
+    /// Show information from multiple maps in list form
+    List(list_tool::ListArgs),
+}
+
+impl Commands {
+    fn run(&self) -> ExitCode {
+        match self {
+            Commands::Info(args) => info_tool::show_info(args),
+            Commands::List(args) => list_tool::list_maps(args),
+        }
+    }
 }
 
 fn main() -> ExitCode {
-    let cli = Cli::parse();
-
-    match cli.command {
-        Commands::Info(args) => show_info(args),
-    }
+    Cli::parse().command.run()
 }
