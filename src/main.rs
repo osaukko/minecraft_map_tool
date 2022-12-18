@@ -1,8 +1,11 @@
 use clap::{Parser, Subcommand};
 use std::process::ExitCode;
 
-pub mod info_tool;
-pub mod list_tool;
+mod info_tool;
+mod list_tool;
+
+#[cfg(feature = "test_tool")]
+mod test_tool;
 
 #[derive(Debug, Parser)]
 #[command(version, long_about = None)]
@@ -20,6 +23,10 @@ enum Commands {
 
     /// Show information from multiple maps in list form
     List(list_tool::ListArgs),
+
+    /// Tools to help program testing
+    #[cfg(feature = "test_tool")]
+    Test(test_tool::TestArgs),
 }
 
 impl Commands {
@@ -27,6 +34,8 @@ impl Commands {
         match self {
             Commands::Info(args) => info_tool::show_info(args),
             Commands::List(args) => list_tool::list_maps(args),
+            #[cfg(feature = "test_tool")]
+            Commands::Test(args) => test_tool::test_tool(args),
         }
     }
 }

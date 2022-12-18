@@ -2,13 +2,12 @@ use crate::error::Result;
 use crate::versions::MINECRAFT_VERSIONS;
 use clap::ValueEnum;
 use fastnbt::ByteArray;
-use flate2::read::GzDecoder;
-use serde::Deserialize;
-use std::cmp::Ordering;
-use std::collections::VecDeque;
+use flate2::{read::GzDecoder, write::GzEncoder, Compression};
+use serde::{Deserialize, Serialize};
 use std::{
-    fs,
-    io::Read,
+    cmp::Ordering,
+    collections::VecDeque,
+    fs::File,
     path::{Path, PathBuf},
 };
 
@@ -17,7 +16,7 @@ pub mod palette;
 pub mod versions;
 
 /// Banner color options
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BannerColor {
     Black,
@@ -45,13 +44,13 @@ impl std::fmt::Display for BannerColor {
 }
 
 /// For deserializing banner name from JSON
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct BannerName {
     text: String,
 }
 
 /// A banner marker
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Banner {
     /// The color of the banner.
@@ -83,7 +82,7 @@ impl Banner {
 }
 
 /// The map data
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MapData {
     /// How zoomed in the map is (it is in 2<sup>scale</sup> wide blocks square per pixel,
@@ -190,9 +189,11 @@ impl std::fmt::Debug for MapData {
 }
 
 /// Content of the map_<#>.dat files
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct MapItem {
-    /// Path to map file (not part of the item itself)
+    /// Path to map file
+    ///
+    /// **Note:** This is not part of the Minecraft map item and therefore is not serialized.
     #[serde(skip)]
     pub file: PathBuf,
 
@@ -207,18 +208,24 @@ pub struct MapItem {
 impl MapItem {
     /// Read map item from the given *file* path
     pub fn read_from(file: &Path) -> Result<MapItem> {
-        // Read map file
-        let compressed_data = fs::read(file)?;
-
-        // Uncompress data
-        let mut gz = GzDecoder::new(&compressed_data[..]);
-        let mut uncompressed_data = Vec::new();
-        gz.read_to_end(&mut uncompressed_data)?;
-
-        // The version the map was created
-        let mut map_item: MapItem = fastnbt::from_bytes(uncompressed_data.as_slice())?;
+        let file_reader = File::open(file)?;
+        let decoder = GzDecoder::new(&file_reader);
+        let mut map_item: MapItem = fastnbt::from_reader(decoder)?;
         map_item.file = PathBuf::from(file);
         Ok(map_item)
+    }
+
+    /// Write map item to custom location
+    pub fn write_to(&self, file: &Path) -> Result<()> {
+        let file_writer = File::create(file)?;
+        let encoder = GzEncoder::new(file_writer, Compression::default());
+        fastnbt::to_writer(encoder, self)?;
+        Ok(())
+    }
+
+    /// Write map item using its [file](MapItem::file) location
+    pub fn write(&self) -> Result<()> {
+        self.write_to(&self.file)
     }
 
     /// Version description
@@ -234,7 +241,7 @@ impl MapItem {
 }
 
 /// A marker
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Marker {
     /// Arbitrary unique value for the marker.
@@ -248,7 +255,7 @@ pub struct Marker {
 }
 
 /// Position coordinate in the Minecraft world
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Pos {
     /// The x-position

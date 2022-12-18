@@ -24,3 +24,7 @@ version = "4.0.29"
 [dependencies.serde]
 features = ["derive"]
 version = "1.0.148"
+
+[features]
+# Builds a test subcommand that can be used to create files for testing
+test_tool = []
