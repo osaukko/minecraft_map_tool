@@ -7,14 +7,19 @@ impl Error {
     pub fn new(kind: ErrorKind) -> Error {
         Error(Box::new(kind))
     }
+
+    pub fn map_item_error(message: &'static str) -> Error {
+        Self::new(ErrorKind::MapItemError(message))
+    }
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self.0 {
+            ErrorKind::FastNbtError(ref err) => err.fmt(f),
             ErrorKind::ImageError(ref err) => err.fmt(f),
             ErrorKind::IoError(ref err) => err.fmt(f),
-            ErrorKind::FastNbtError(ref err) => err.fmt(f),
+            ErrorKind::MapItemError(message) => message.fmt(f),
         }
     }
 }
@@ -42,4 +47,5 @@ pub enum ErrorKind {
     FastNbtError(fastnbt::error::Error),
     ImageError(image::ImageError),
     IoError(std::io::Error),
+    MapItemError(&'static str),
 }

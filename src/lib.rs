@@ -1,8 +1,10 @@
-use crate::error::Result;
+use crate::error::{Error, Result};
+use crate::palette::Palette;
 use crate::versions::MINECRAFT_VERSIONS;
 use clap::ValueEnum;
 use fastnbt::ByteArray;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
+use image::{Rgba, RgbaImage};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
@@ -206,6 +208,22 @@ pub struct MapItem {
 }
 
 impl MapItem {
+    pub fn make_image(&self, palette: Palette) -> Result<RgbaImage> {
+        let mut image = RgbaImage::new(128, 128);
+        let mut color = self.data.colors.iter();
+        for y in 0..128 {
+            for x in 0..128 {
+                let c = *color
+                    .next()
+                    .ok_or_else(|| Error::map_item_error("Color buffer incomplete"))?
+                    as u8;
+                let pixel = palette.get(c as usize).unwrap_or(&Rgba([0, 0, 0, 0]));
+                image.put_pixel(x, y, *pixel);
+            }
+        }
+        Ok(image)
+    }
+
     /// Read map item from the given *file* path
     pub fn read_from(file: &Path) -> Result<MapItem> {
         let file_reader = File::open(file)?;
@@ -360,13 +378,6 @@ pub enum SortingOrder {
 
 impl SortingOrder {
     /// This method returns an Ordering between *a* and *b* path based on *self* value.
-    ///
-    /// # Example
-    /// ```rust
-    /// use minecraft_map_tool::SortingOrder;
-    /// let sorter = SortingOrder::Name;
-    /// map_files.sort_by(|a, b| sorter.cmp(a, b));
-    /// ```
     pub fn cmp(&self, a: &Path, b: &Path) -> Ordering {
         match self {
             SortingOrder::Name => {
@@ -388,5 +399,64 @@ impl SortingOrder {
                 a_modified.cmp(b_modified)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::palette::{generate_palette, BASE_COLORS_2699};
+    use crate::MapItem;
+    use image::{GenericImageView, Pixel};
+    use std::collections::BTreeMap;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn test_make_image() {
+        let map_item = MapItem::read_from(&project_file(&Path::new("tests/map_0.dat"))).unwrap();
+        let map_image = map_item
+            .make_image(generate_palette(&BASE_COLORS_2699))
+            .unwrap();
+        let reference_image = image::open(&project_file(&Path::new("tests/map_0.png"))).unwrap();
+        assert_eq!(map_image.dimensions(), reference_image.dimensions());
+
+        // Comparing each pixel and collecting wrong colors to map
+        let mut wrong_colors = BTreeMap::new();
+        for y in 0..128 {
+            for x in 0..128 {
+                let map_pixel = *map_image.get_pixel(x, y);
+                let reference_pixel = reference_image.get_pixel(x, y);
+                if map_pixel != reference_pixel {
+                    // Find the color value that is wrong
+                    let color = *map_item.data.colors.get((y * 128 + x) as usize).unwrap();
+                    wrong_colors
+                        .entry(color as u8)
+                        .or_insert((map_pixel, reference_pixel));
+                }
+            }
+        }
+
+        // Panic if wrong colors is not empty
+        if !wrong_colors.is_empty() {
+            // Formatting errors for easy to read format
+            let mut wrong_colors_message = format!(
+                "{:<8}#{:<12}#{:<12}\n",
+                "Color", "What it is", "What it should be"
+            );
+            for (color, (left, right)) in wrong_colors {
+                wrong_colors_message.push_str(&format!(
+                    "{:<8}#{:<12}#{:<12}\n",
+                    color,
+                    hex::encode(left.channels()),
+                    hex::encode(right.channels())
+                ))
+            }
+            panic!("{}", wrong_colors_message);
+        }
+    }
+
+    fn project_file(path: &Path) -> PathBuf {
+        let mut relative_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        relative_path.push(path);
+        relative_path
     }
 }

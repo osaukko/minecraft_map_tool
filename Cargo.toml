@@ -25,6 +25,9 @@ version = "4.0.29"
 features = ["derive"]
 version = "1.0.148"
 
+[dev-dependencies]
+hex = "0.4.3"
+
 [features]
 # Builds a test subcommand that can be used to create files for testing
 test_tool = []
