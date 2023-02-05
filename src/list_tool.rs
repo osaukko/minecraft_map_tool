@@ -24,7 +24,7 @@ pub fn list_maps(args: &ListArgs) -> ExitCode {
     let maps = match read_maps(&args.path, &args.sort, args.recursive) {
         Ok(maps) => maps,
         Err(err) => {
-            eprintln!("Could not get maps: {}", err);
+            eprintln!("Could not get maps: {err}");
             return ExitCode::FAILURE;
         }
     };

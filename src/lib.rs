@@ -41,7 +41,7 @@ pub enum BannerColor {
 
 impl std::fmt::Display for BannerColor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -338,7 +338,7 @@ pub fn read_maps(path: &Path, sort: &SortingOrder, recursive: bool) -> Result<Re
         let read_dir = match dir.read_dir() {
             Ok(read_dir) => read_dir,
             Err(err) => {
-                eprintln!("Warning: Could not read: {:?}, {}", dir, err);
+                eprintln!("Warning: Could not read: {dir:?}, {err}");
                 continue;
             }
         };

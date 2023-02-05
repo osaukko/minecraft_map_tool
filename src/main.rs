@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::process::ExitCode;
 
+mod image_tool;
 mod info_tool;
 mod list_tool;
 
@@ -21,6 +22,9 @@ enum Commands {
     /// Show information on map_#.dat file
     Info(info_tool::InfoArgs),
 
+    /// Create an image from a single map file
+    Image(image_tool::ImageArgs),
+
     /// Show information from multiple maps in list form
     List(list_tool::ListArgs),
 
@@ -33,6 +37,7 @@ impl Commands {
     fn run(&self) -> ExitCode {
         match self {
             Commands::Info(args) => info_tool::show_info(args),
+            Commands::Image(args) => image_tool::create_image(args),
             Commands::List(args) => list_tool::list_maps(args),
             #[cfg(feature = "test_tool")]
             Commands::Test(args) => test_tool::test_tool(args),

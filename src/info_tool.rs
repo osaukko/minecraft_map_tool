@@ -19,7 +19,7 @@ pub fn show_info(args: &InfoArgs) -> ExitCode {
     let map_item = match MapItem::read_from(&args.file) {
         Ok(map_item) => map_item,
         Err(err) => {
-            eprintln!("Could not read map item: {}", err);
+            eprintln!("Could not read map item: {err}");
             return ExitCode::FAILURE;
         }
     };
@@ -121,7 +121,7 @@ impl TextFrame<'_> {
         queue!(
             stdout(),
             SetAttribute(Attribute::Bold),
-            Print(format!("{}─{:─>fill_width$}\n", left, right)),
+            Print(format!("{left}─{right:─>fill_width$}\n")),
             SetAttribute(Attribute::Reset)
         )
         .unwrap();
