@@ -1,10 +1,17 @@
 use clap::{arg, Args};
-use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-use comfy_table::presets::UTF8_FULL_CONDENSED;
 use comfy_table::{Cell, ContentArrangement, Table};
 use minecraft_map_tool::{read_maps, SortingOrder};
 use std::path::PathBuf;
 use std::process::ExitCode;
+
+#[cfg(not(target_os = "windows"))]
+const PRESET: &str = "││──╞═╪╡┆    ┬┴╭╮╰╯";
+
+// In Windows, rounded corners will work if the user has changed the command prompt to use
+// a UTF-8 compatible font. However, by default, this is not the case; therefore, we use
+// rectangular borders instead.
+#[cfg(target_os = "windows")]
+const PRESET: &str = "││──├─┼┤│    ┬┴┌┐└┘";
 
 #[derive(Args, Debug)]
 pub struct ListArgs {
@@ -35,8 +42,7 @@ pub fn list_maps(args: &ListArgs) -> ExitCode {
     let common_base_path = maps.common_base_path().unwrap_or_default();
     let mut table = Table::new();
     table
-        .load_preset(UTF8_FULL_CONDENSED)
-        .apply_modifier(UTF8_ROUND_CORNERS)
+        .load_preset(PRESET)
         .set_content_arrangement(ContentArrangement::Dynamic)
         .set_header(vec![
             "File",

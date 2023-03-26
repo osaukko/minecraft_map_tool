@@ -27,7 +27,6 @@ features = ["derive"]
 version = "1"
 
 [dependencies.viuer]
-features = ["sixel"]
 version = "0"
 
 [dev-dependencies]
@@ -36,3 +35,4 @@ hex = "0"
 [features]
 # Builds a test subcommand that can be used to create files for testing
 test_tool = []
+sixel = ["viuer/sixel"]

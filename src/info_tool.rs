@@ -15,6 +15,15 @@ pub struct InfoArgs {
     file: PathBuf,
 }
 
+#[cfg(not(target_os = "windows"))]
+pub const CORNERS: &str = "╭╮╰╯";
+
+// In Windows, rounded corners will work if the user has changed the command prompt to use
+// a UTF-8 compatible font. However, by default, this is not the case; therefore, we use
+// rectangular borders instead.
+#[cfg(target_os = "windows")]
+pub const CORNERS: &str = "┌┐└┘";
+
 pub fn show_info(args: &InfoArgs) -> ExitCode {
     let map_item = match MapItem::read_from(&args.file) {
         Ok(map_item) => map_item,
@@ -58,11 +67,12 @@ pub fn show_info(args: &InfoArgs) -> ExitCode {
     }
 
     // Printing frames
-    frames[0].print(width, '╭', '╮');
+    let mut corners = CORNERS.chars();
+    frames[0].print(width, corners.next().unwrap(), corners.next().unwrap());
     for frame in &mut frames[1..] {
         frame.print(width, '├', '┤');
     }
-    TextFrame::print_bottom(width, '╰', '╯');
+    TextFrame::print_bottom(width, corners.next().unwrap(), corners.next().unwrap());
 
     ExitCode::SUCCESS
 }

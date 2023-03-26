@@ -14,7 +14,7 @@ pub struct ImageArgs {
     #[arg(short, long)]
     output_file: Option<PathBuf>,
 
-    /// Show map in terminal using iTerm, Kitty, or Sixel graphics protocol
+    /// Show map in terminal
     #[arg(short, long, group = "term")]
     show_in_terminal: bool,
 }
