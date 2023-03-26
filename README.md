@@ -6,35 +6,91 @@ This repository has a program that can tell you information about the maps in th
 
 With luck, this program will also be helpful for others. Please note that the program handles the game's map items, the same ones we fill in the game. The program does not draw maps from the chunks.
 
-## How to use
+## Build
+
+The program is written in rust. If you do not already have rust, we recommend you install it using `rustup`. The official rust [book](https://doc.rust-lang.org/book/) contains [instructions](https://doc.rust-lang.org/book/ch01-01-installation.html) on how to install rust on Linux, macOS, and Windows.
+
+To build use the following command:
+
+```bash
+cargo build --release
+```
+
+We can now find tool binaries under to directory `target/release/`
+
+## How to Use
 
 Start by filling maps in the game.
 
 ![A Minecraft player holding a large number of maps](docs/maps.png "Maps, lots of maps")
 
-Use the application to generate an image from them.
+### Show Info
 
-```bash
-$ minecraft_map_tool -i /path/to/map/data/ image -- 0 -52 -1087 747 -788 title.png
 ```
+Show information on map_#.dat file
 
-The program tells you how to use it if you ask for help from it.
+Usage: minecraft_map_tool info <FILE>
 
-```bash
-$ minecraft_map_tool help
-This program tells information about map files and creates images from them
-
-Usage: minecraft_map_tool [OPTIONS] <COMMAND>
-
-Commands:
-  list    List maps and their information
-  image   Create one image from multiple maps
-  images  Create an image from each map
-  help    Print this message or the help of the given subcommand(s)
+Arguments:
+  <FILE>  Show info on this map_#.dat file
 
 Options:
-  -i, --input-dir <PATH>   Directory where map data files are [default: data]
-  -o, --output-dir <PATH>  Output directory where image(s) are written [default: images]
-  -h, --help               Print help information
-  -V, --version            Print version information
+  -h, --help  Print help
 ```
+
+```bash
+minecraft_map_tool info tests/map_0.dat
+```
+
+### Show Info for Multiple files
+
+```
+Show information from multiple maps in list form
+
+Usage: minecraft_map_tool list [OPTIONS] <PATH>
+
+Arguments:
+  <PATH>
+          The directory from which map files are searched for
+
+Options:
+  -r, --recursive
+          Search map files recursively in subdirectories
+
+  -s, --sort <SORT>
+          Sorting order for files
+          
+          [default: name]
+
+          Possible values:
+          - name: Files are organized by name and numbers in the natural order
+          - time: Files are organized from oldest to newest
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+```bash
+minecraft_map_tool list -r -s name ~/Games/Minecraft/
+```
+
+### Make Map Image
+
+```
+Create an image from a single map file
+
+Usage: minecraft_map_tool image [OPTIONS] <MAP_FILE>
+
+Arguments:
+  <MAP_FILE>  Create image of this map_#.dat file
+
+Options:
+  -o, --output-file <OUTPUT_FILE>  Write the map image to the file. Standard file formats are supported
+  -s, --show-in-terminal           Show map in terminal using iTerm, Kitty, or Sixel graphics protocol
+  -h, --help                       Print help
+```
+
+```bash
+ minecraft_map_tool image tests/map_0.dat -o test.png
+```
+
