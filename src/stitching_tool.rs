@@ -12,7 +12,7 @@ pub struct StitchingArgs {
     recursive: bool,
 }
 
-pub fn stitch_maps(args: &StitchingArgs) -> ExitCode {
+pub fn run(args: &StitchingArgs) -> ExitCode {
     eprintln!("TODO! {args:#?}");
     ExitCode::FAILURE
 }

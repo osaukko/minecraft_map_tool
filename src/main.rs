@@ -7,8 +7,11 @@ mod info_tool;
 mod list_tool;
 mod stitching_tool;
 
-#[cfg(feature = "test_tool")]
-mod test_tool;
+#[cfg(feature = "dev_tools")]
+mod test_map;
+
+#[cfg(feature = "dev_tools")]
+mod update_versions;
 
 #[derive(Debug, Parser)]
 #[command(version, about)]
@@ -50,21 +53,32 @@ enum Commands {
     /// Drawing multiple maps into a single image
     Stitch(stitching_tool::StitchingArgs),
 
-    /// Tools to help program testing
-    #[cfg(feature = "test_tool")]
-    Test(test_tool::TestArgs),
+    /// Create test map item with all colors
+    #[cfg(feature = "dev_tools")]
+    TestMap(test_map::TestMapArgs),
+
+    /// Attempts to download the versions list from
+    /// the Minecraft Wiki and update the versions source file.
+    #[cfg(feature = "dev_tools")]
+    UpdateVersions(update_versions::UpdateVersionsArgs),
 }
 
 impl Commands {
     fn run(&self) -> ExitCode {
         match self {
-            Commands::Info(args) => info_tool::show_info(args),
-            Commands::Image(args) => image_tool::create_image(args),
-            Commands::Images(args) => images_tool::create_images(args),
-            Commands::List(args) => list_tool::list_maps(args),
-            Commands::Stitch(args) => stitching_tool::stitch_maps(args),
-            #[cfg(feature = "test_tool")]
-            Commands::Test(args) => test_tool::test_tool(args),
+            // Default tools
+            Commands::Info(args) => info_tool::run(args),
+            Commands::Image(args) => image_tool::run(args),
+            Commands::Images(args) => images_tool::run(args),
+            Commands::List(args) => list_tool::run(args),
+            Commands::Stitch(args) => stitching_tool::run(args),
+
+            // Development tools
+            #[cfg(feature = "dev_tools")]
+            Commands::TestMap(args) => test_map::run(args),
+
+            #[cfg(feature = "dev_tools")]
+            Commands::UpdateVersions(args) => update_versions::run(args),
         }
     }
 }

@@ -27,7 +27,7 @@ pub struct ListArgs {
     sort: SortingOrder,
 }
 
-pub fn list_maps(args: &ListArgs) -> ExitCode {
+pub fn run(args: &ListArgs) -> ExitCode {
     let maps = match read_maps(&args.path, &args.sort, args.recursive) {
         Ok(maps) => maps,
         Err(err) => {
@@ -63,7 +63,7 @@ pub fn list_maps(args: &ListArgs) -> ExitCode {
         table.add_row(vec![
             Cell::new(file.display()),
             Cell::new(map.data.scale),
-            Cell::new(map.data.pretty_dimension()),
+            Cell::new(map.pretty_dimension()),
             Cell::new(map.data.locked),
             Cell::new(format!("{}, {}", map.data.x_center, map.data.z_center)),
             Cell::new(map.data.left()),

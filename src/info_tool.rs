@@ -24,7 +24,7 @@ pub const CORNERS: &str = "╭╮╰╯";
 #[cfg(target_os = "windows")]
 pub const CORNERS: &str = "┌┐└┘";
 
-pub fn show_info(args: &InfoArgs) -> ExitCode {
+pub fn run(args: &InfoArgs) -> ExitCode {
     let map_item = match MapItem::read_from(&args.file) {
         Ok(map_item) => map_item,
         Err(err) => {
@@ -161,10 +161,7 @@ fn make_basic_info_table(map_item: &MapItem) -> Table {
         map_item.data_version.to_string(),
         map_item.version_description(),
     ]);
-    table.add_row(vec![
-        "Dimension".to_string(),
-        map_item.data.pretty_dimension(),
-    ]);
+    table.add_row(vec!["Dimension".to_string(), map_item.pretty_dimension()]);
     table.add_row(vec!["Locked".to_string(), yes_or_no(map_item.data.locked)]);
     table
 }

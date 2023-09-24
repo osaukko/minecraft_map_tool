@@ -133,9 +133,6 @@ impl MapData {
     /// Pretty dimension
     ///
     /// Returns `Overworld` instead of `minecraft:overworld`
-    ///
-    /// TODO: Change to figure out dimension from the file path,
-    ///       it seems that the dimension is always "Overworld"
     pub fn pretty_dimension(&self) -> String {
         match self.dimension.find(':') {
             None => self.dimension.clone(),
@@ -222,6 +219,26 @@ impl MapItem {
             }
         }
         Ok(image)
+    }
+
+    /// Pretty dimension from file path
+    ///
+    /// This function tries to identify the dimension from the file path.
+    ///
+    /// | Path contains   | Name                           |
+    /// | --------------- | ------------------------------ |
+    /// | _nether         | The Nether                     |
+    /// | _the_end        | The End                        |
+    /// | (none of above) | `self.data.pretty_dimension()` |
+    pub fn pretty_dimension(&self) -> String {
+        let path = self.file.to_string_lossy();
+        if path.contains("_nether") {
+            String::from("The Nether")
+        } else if path.contains("_the_end") {
+            String::from("The End")
+        } else {
+            self.data.pretty_dimension()
+        }
     }
 
     /// Read map item from the given *file* path

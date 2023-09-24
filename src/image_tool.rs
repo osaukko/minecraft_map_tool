@@ -19,7 +19,7 @@ pub struct ImageArgs {
     show_in_terminal: bool,
 }
 
-pub fn create_image(args: &ImageArgs) -> ExitCode {
+pub fn run(args: &ImageArgs) -> ExitCode {
     let map_item = match MapItem::read_from(&args.map_file) {
         Ok(map_item) => map_item,
         Err(err) => {
