@@ -43,7 +43,7 @@ pub fn run(args: &ImagesArgs) -> ExitCode {
             output_dir.push(PathBuf::from(map.pretty_dimension()));
         }
         let output_file =
-            Path::join(&output_dir, &map.file.file_stem().unwrap()).with_extension("png");
+            Path::join(&output_dir, map.file.file_stem().unwrap()).with_extension("png");
         if let Err(error) = fs::create_dir_all(output_dir) {
             eprintln!("Could not create output directory: {error}");
             return ExitCode::FAILURE;

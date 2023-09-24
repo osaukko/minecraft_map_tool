@@ -137,7 +137,7 @@ impl MapData {
     pub fn pretty_dimension(&self) -> String {
         match self.dimension.find(':') {
             None => self.dimension.clone(),
-            Some(pos) => self.dimension[pos + 1..].replace("_", " ").to_title_case(),
+            Some(pos) => self.dimension[pos + 1..].replace('_', " ").to_title_case(),
         }
     }
 
@@ -432,7 +432,7 @@ mod tests {
     fn test_make_image() {
         let map_item = MapItem::read_from(&project_file(&Path::new("tests/map_0.dat"))).unwrap();
         let map_image = map_item
-            .make_image(generate_palette(&BASE_COLORS_2699))
+            .make_image(&generate_palette(&BASE_COLORS_2699))
             .unwrap();
         let reference_image = image::open(&project_file(&Path::new("tests/map_0.png"))).unwrap();
         assert_eq!(map_image.dimensions(), reference_image.dimensions());
