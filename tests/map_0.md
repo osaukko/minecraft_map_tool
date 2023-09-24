@@ -28,7 +28,7 @@ To extract the map texture from Minecraft, we want to create and start a new cre
 
 Next, we restart the game with the *apitrace*. An easy way to use *apitrace* is launching Minecraft using Prism Launcher. In Prism Launcher, we can add *apitrace* as a wrapper command:
 
-<img src="prism_launcher_apitrace@2x.png" alt="Prism Launcher is good way to add apitrace as Wrapper command" style="zoom:50%;" />
+<img src="prism_launcher_apitrace@2x.png" alt="Prism Launcher is good way to add apitrace as Wrapper command" width="616" />
 
 Now, in the game, we open the world and hold the map item in hand to get a frame with our example map as texture. The test map file is locked, so the game will not overwrite its contents.
 
@@ -40,6 +40,6 @@ Next, we expand all the commands of the appropriate frame, select them, and pres
 
 By double-clicking the appropriate rendering call, we get content for that point. The Surfaces tab has the texture we want.
 
-<img src="qapitrace@2x.png" alt="A suitable rendering call has been found, and the texture can be found in the Surfaces tab" style="zoom:50%;" />
+<img src="qapitrace@2x.png" alt="A suitable rendering call has been found, and the texture can be found in the Surfaces tab" width="961" />
 
 Finally, we double-click on the texture to open it. In the texture viewer window, we want to check the flip checkbox and then save the image by pressing the right mouse button over the texture.
