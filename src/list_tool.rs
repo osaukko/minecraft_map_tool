@@ -54,6 +54,8 @@ pub fn run(args: &ListArgs) -> ExitCode {
             "Top",
             "Right",
             "Bottom",
+            "Banners",
+            "Frames",
         ]);
     for map in maps.flatten() {
         let file = match map.file.strip_prefix(&common_base_path) {
@@ -70,6 +72,8 @@ pub fn run(args: &ListArgs) -> ExitCode {
             Cell::new(map.data.top()),
             Cell::new(map.data.right()),
             Cell::new(map.data.bottom()),
+            Cell::new(map.data.banners.len()),
+            Cell::new(map.data.frames.len()),
         ]);
     }
     println!("{table}");
