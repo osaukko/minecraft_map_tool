@@ -28,7 +28,7 @@ pub fn run(args: &ImageArgs) -> ExitCode {
         }
     };
 
-    let image = match map_item.make_image(generate_palette(&BASE_COLORS_2699)) {
+    let image = match map_item.make_image(&generate_palette(&BASE_COLORS_2699)) {
         Ok(image) => image,
         Err(err) => {
             eprintln!("Could not create image: {err}");

@@ -24,7 +24,7 @@ pub struct ListArgs {
 
     /// Sorting order for files
     #[arg(short, long, default_value = "name")]
-    sort: SortingOrder,
+    sort: Option<SortingOrder>,
 }
 
 pub fn run(args: &ListArgs) -> ExitCode {

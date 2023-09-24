@@ -4,6 +4,7 @@ use crate::versions::MINECRAFT_VERSIONS;
 use clap::ValueEnum;
 use fastnbt::ByteArray;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
+use heck::ToTitleCase;
 use image::{Rgba, RgbaImage};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -136,9 +137,7 @@ impl MapData {
     pub fn pretty_dimension(&self) -> String {
         match self.dimension.find(':') {
             None => self.dimension.clone(),
-            Some(pos) => {
-                self.dimension[pos + 1..pos + 2].to_uppercase() + &self.dimension[pos + 2..]
-            }
+            Some(pos) => self.dimension[pos + 1..].replace("_", " ").to_title_case(),
         }
     }
 
@@ -205,7 +204,7 @@ pub struct MapItem {
 }
 
 impl MapItem {
-    pub fn make_image(&self, palette: Palette) -> Result<RgbaImage> {
+    pub fn make_image(&self, palette: &Palette) -> Result<RgbaImage> {
         let mut image = RgbaImage::new(128, 128);
         let mut color = self.data.colors.iter();
         for y in 0..128 {
@@ -346,7 +345,7 @@ impl Iterator for ReadMap {
     }
 }
 
-pub fn read_maps(path: &Path, sort: &SortingOrder, recursive: bool) -> Result<ReadMap> {
+pub fn read_maps(path: &Path, sort: &Option<SortingOrder>, recursive: bool) -> Result<ReadMap> {
     let mut directory_stack = VecDeque::new();
     let mut map_files = VecDeque::new();
     directory_stack.push_back(PathBuf::from(path));
@@ -379,7 +378,9 @@ pub fn read_maps(path: &Path, sort: &SortingOrder, recursive: bool) -> Result<Re
             }
         }
     }
-    map_files.make_contiguous().sort_by(|a, b| sort.cmp(a, b));
+    if let Some(sort) = sort {
+        map_files.make_contiguous().sort_by(|a, b| sort.cmp(a, b));
+    }
     Ok(ReadMap { map_files })
 }
 
