@@ -7,16 +7,20 @@ use std::process::ExitCode;
 
 #[derive(Args, Debug)]
 pub struct ImagesArgs {
-    /// The directory from which map files are searched for
+    /// The directory from which map files are searched for.
     path: PathBuf,
 
     /// Output directory. Default is the current directory.
     #[arg(short, long)]
     output_dir: Option<PathBuf>,
 
-    /// Search map files recursively in subdirectories
+    /// Search map files recursively in subdirectories.
     #[arg(short, long)]
     recursive: bool,
+
+    /// Try to detect world dimensions from the file path instead of map item data.
+    #[arg(short, long)]
+    dimension_from_path: bool,
 }
 
 pub fn run(args: &ImagesArgs) -> ExitCode {
@@ -39,9 +43,11 @@ pub fn run(args: &ImagesArgs) -> ExitCode {
     // Process maps
     for map in maps.flatten() {
         let mut output_dir = args.output_dir.clone().unwrap_or_default();
-        if args.recursive {
-            output_dir.push(PathBuf::from(map.pretty_dimension()));
-        }
+        output_dir.push(PathBuf::from(if args.dimension_from_path {
+            map.pretty_dimension_from_path()
+        } else {
+            map.data.pretty_dimension()
+        }));
         let output_file =
             Path::join(&output_dir, map.file.file_stem().unwrap()).with_extension("png");
         if let Err(error) = fs::create_dir_all(output_dir) {

@@ -223,13 +223,14 @@ impl MapItem {
     /// Pretty dimension from file path
     ///
     /// This function tries to identify the dimension from the file path.
+    /// Can be useful for same rare cases.  
     ///
     /// | Path contains   | Name                           |
     /// | --------------- | ------------------------------ |
     /// | _nether         | The Nether                     |
     /// | _the_end        | The End                        |
     /// | (none of above) | `self.data.pretty_dimension()` |
-    pub fn pretty_dimension(&self) -> String {
+    pub fn pretty_dimension_from_path(&self) -> String {
         let path = self.file.to_string_lossy();
         if path.contains("_nether") {
             String::from("The Nether")

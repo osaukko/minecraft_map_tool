@@ -25,6 +25,10 @@ pub struct ListArgs {
     /// Sorting order for files
     #[arg(short, long, default_value = "name")]
     sort: Option<SortingOrder>,
+
+    /// Try to detect world dimensions from the file path instead of map item data.
+    #[arg(short, long)]
+    dimension_from_path: bool,
 }
 
 pub fn run(args: &ListArgs) -> ExitCode {
@@ -65,7 +69,11 @@ pub fn run(args: &ListArgs) -> ExitCode {
         table.add_row(vec![
             Cell::new(file.display()),
             Cell::new(map.data.scale),
-            Cell::new(map.pretty_dimension()),
+            Cell::new(if args.dimension_from_path {
+                map.pretty_dimension_from_path()
+            } else {
+                map.data.pretty_dimension()
+            }),
             Cell::new(map.data.locked),
             Cell::new(format!("{}, {}", map.data.x_center, map.data.z_center)),
             Cell::new(map.data.left()),

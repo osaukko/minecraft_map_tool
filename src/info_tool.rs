@@ -13,6 +13,10 @@ use std::{
 pub struct InfoArgs {
     /// Show info on this map_#.dat file
     file: PathBuf,
+
+    /// Try to detect world dimensions from the file path instead of map item data.
+    #[arg(short, long)]
+    dimension_from_path: bool,
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -37,7 +41,7 @@ pub fn run(args: &InfoArgs) -> ExitCode {
     let mut frames = Vec::new();
     frames.push(TextFrame {
         title: map_item.file.file_name().unwrap().to_str().unwrap(),
-        content: make_basic_info_table(&map_item),
+        content: make_basic_info_table(&map_item, args.dimension_from_path),
     });
     frames.push(TextFrame {
         title: "Tracking",
@@ -148,7 +152,7 @@ fn yes_or_no(byte: i8) -> String {
     .to_string()
 }
 
-fn make_basic_info_table(map_item: &MapItem) -> Table {
+fn make_basic_info_table(map_item: &MapItem, dimension_from_path: bool) -> Table {
     let mut table = Table::new();
     table.load_preset(presets::NOTHING);
     table.add_row(vec![
@@ -161,7 +165,14 @@ fn make_basic_info_table(map_item: &MapItem) -> Table {
         map_item.data_version.to_string(),
         map_item.version_description(),
     ]);
-    table.add_row(vec!["Dimension".to_string(), map_item.pretty_dimension()]);
+    table.add_row(vec![
+        "Dimension".to_string(),
+        if dimension_from_path {
+            map_item.pretty_dimension_from_path()
+        } else {
+            map_item.data.pretty_dimension()
+        },
+    ]);
     table.add_row(vec!["Locked".to_string(), yes_or_no(map_item.data.locked)]);
     table
 }
