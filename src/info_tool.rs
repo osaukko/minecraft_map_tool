@@ -195,22 +195,22 @@ fn make_coordinate_table(map_item: &MapItem) -> Table {
     let mut table = Table::new();
     table.load_preset(presets::NOTHING);
     table.add_row(vec![
-        "Upper (CellAlignment::Left)".to_string(),
+        "Upper Left".to_string(),
         map_item.data.left().to_string(),
         map_item.data.top().to_string(),
     ]);
     table.add_row(vec![
-        "Lower (CellAlignment::Left)".to_string(),
+        "Lower Left".to_string(),
         map_item.data.left().to_string(),
         map_item.data.bottom().to_string(),
     ]);
     table.add_row(vec![
-        "Upper (CellAlignment::Right)".to_string(),
+        "Upper Right".to_string(),
         map_item.data.right().to_string(),
         map_item.data.top().to_string(),
     ]);
     table.add_row(vec![
-        "Lower (CellAlignment::Right)".to_string(),
+        "Lower Right".to_string(),
         map_item.data.right().to_string(),
         map_item.data.bottom().to_string(),
     ]);
