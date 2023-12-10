@@ -1,17 +1,21 @@
 [package]
-name = "minecraft_map_tool"
 authors = ["Ossi Saukko <osaukko@gmail.com>"]
 description = "Utility for handling Minecraft map files"
-version = "0.2.0"
 edition = "2021"
+license-file = "LICENSE"
+name = "minecraft_map_tool"
+publish = false
+version = "0.2.0"
 
 [dependencies]
+anyhow = "1.0.75"
 comfy-table = "7.1"
 crossterm = "0.27"
 fastnbt = "2.4"
 flate2 = "1.0"
 heck = "0.4"
 image = "0.24"
+indicatif = "0.17.7"
 natord = "1.0"
 serde_json = "1.0"
 viuer = "0.7"

@@ -331,6 +331,14 @@ impl ReadMap {
         Some(base)
     }
 
+    pub fn file_count(&self) -> usize {
+        self.map_files.len()
+    }
+
+    pub fn from_paths(map_files: VecDeque<PathBuf>) -> ReadMap {
+        ReadMap { map_files }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.map_files.is_empty()
     }
