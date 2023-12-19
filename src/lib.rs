@@ -1,195 +1,497 @@
 use crate::error::{Error, Result};
 use crate::palette::Palette;
-use flate2::read::GzDecoder;
+use crate::versions::MINECRAFT_VERSIONS;
+use clap::ValueEnum;
+use fastnbt::ByteArray;
+use flate2::{read::GzDecoder, write::GzEncoder, Compression};
+use heck::ToTitleCase;
 use image::{Rgba, RgbaImage};
-use std::fs;
-use std::io::Read;
-use std::path::{Path, PathBuf};
-use valence_nbt::{from_binary_slice, Value};
+use serde::{Deserialize, Serialize};
+use std::{
+    cmp::Ordering,
+    collections::VecDeque,
+    fs::File,
+    path::{Path, PathBuf},
+};
 
 pub mod error;
 pub mod palette;
+pub mod versions;
 
-// Sorting order for map files
-#[derive(Debug)]
-pub enum SortingOrder {
-    SortByTime,
-    SortByNaturalFilename,
+/// Banner color options
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BannerColor {
+    Black,
+    Blue,
+    Brown,
+    Cyan,
+    Gray,
+    Green,
+    LightBlue,
+    LightGray,
+    Lime,
+    Magenta,
+    Orange,
+    Pink,
+    Purple,
+    Red,
+    White,
+    Yellow,
 }
 
-impl SortingOrder {
-    fn sorting_method(&self, a: &Path, b: &Path) -> std::cmp::Ordering {
-        match self {
-            SortingOrder::SortByTime => {
-                let a_modified = &a.metadata().unwrap().modified().unwrap();
-                let b_modified = &b.metadata().unwrap().modified().unwrap();
-                a_modified.cmp(b_modified)
-            }
-            SortingOrder::SortByNaturalFilename => {
-                natord::compare(&a.display().to_string(), &b.display().to_string())
-            }
+impl std::fmt::Display for BannerColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+/// For deserializing banner name from JSON
+#[derive(Debug, Deserialize, Serialize)]
+struct BannerName {
+    text: String,
+}
+
+/// A banner marker
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct Banner {
+    /// The color of the banner.
+    pub color: BannerColor,
+
+    /// The custom name of the banner, in JSON text. May not exist.
+    pub name: Option<String>,
+
+    /// The block position of the banner in the world.
+    pub pos: Pos,
+}
+
+impl Banner {
+    /// Returns the name only
+    ///
+    /// Names are stored into JSON, and this function tries to extract the name out of JSON.
+    /// If banner does not have name, then `[nameless]` is returned.
+    ///
+    /// If name parsing from JSON fails, then error message is returned as name
+    pub fn extract_name(&self) -> String {
+        let json = match &self.name {
+            None => return "[nameless]".to_string(),
+            Some(json) => json,
+        };
+
+        // Try to deserialize from BannerName JSON format
+        if let Ok(banner_name) = serde_json::from_str::<BannerName>(json) {
+            return banner_name.text;
+        }
+
+        // Try to deserialize as plain string
+        match serde_json::from_str::<String>(json) {
+            Ok(banner_name) => banner_name,
+            Err(error) => error.to_string(),
         }
     }
 }
 
-/// Some of the data available from map_<#>.dat files
-#[derive(Debug)]
-pub struct MapItem {
-    /// Map file path
-    pub file: PathBuf,
-
-    /// How zoomed in the map is
+/// The map data
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapData {
+    /// How zoomed in the map is (it is in 2<sup>scale</sup> wide blocks square per pixel,
+    /// even for 0, where the map is 1:1). Minimum 0 and maximum 4.
     pub scale: i8,
 
-    /// Map item dimension
+    /// For <1.16 (byte): 0 = The Overworld, -1 = The Nether, 1 = The End,
+    /// any other value = a static image with no player pin.
+    /// In >=1.16 this is the resource location of a dimension instead.
     pub dimension: String,
 
-    /// Is the map has been locked in a cartography table?
-    pub locked: bool,
+    /// 1 indicates that a positional arrow should be shown when the map is near its
+    /// center coords. 0 indicates that the position arrow should never be shown.
+    pub tracking_position: i8,
 
-    /// Map center (x, z)
-    pub center: (i32, i32),
+    /// 1 allows the player position indicator to show as a smaller dot on the map's edge when the
+    /// player is farther than 320 * (scale+1) blocks from the map's center. 0 makes the dot instead
+    /// disappear when the player is farther than this distance.
+    pub unlimited_tracking: i8,
 
-    /// Pixel data
-    pub colors: Vec<i8>,
+    /// 1 if the map has been locked in a cartography table.
+    pub locked: i8,
+
+    /// Center of map according to real world by X.
+    pub x_center: i32,
+
+    /// Center of map according to real world by Z.
+    pub z_center: i32,
+
+    /// List of banner markers added to this map. May be empty.
+    pub banners: Vec<Banner>,
+
+    /// List map markers added to this map. May be empty.
+    pub frames: Vec<Marker>,
+
+    /// Width * Height array of color values (16384 entries for a default 128×128 map).
+    pub colors: ByteArray,
+}
+
+impl MapData {
+    /// Scale description in format of 1:1, 1:2, etc.
+    pub fn scale_description(&self) -> String {
+        format!("1:{}", 2i32.pow(self.scale as u32))
+    }
+
+    /// Pretty dimension
+    ///
+    /// Returns `Overworld` instead of `minecraft:overworld`
+    pub fn pretty_dimension(&self) -> String {
+        match self.dimension.find(':') {
+            None => self.dimension.clone(),
+            Some(pos) => self.dimension[pos + 1..].replace('_', " ").to_title_case(),
+        }
+    }
+
+    /// X coordinate for pixels on the left edge of the map
+    pub fn left(&self) -> i32 {
+        self.x_center - 64 * 2i32.pow(self.scale as u32)
+    }
+
+    /// Z coordinate for pixels on the top edge of the map
+    pub fn top(&self) -> i32 {
+        self.z_center - 64 * 2i32.pow(self.scale as u32)
+    }
+
+    /// X coordinate for pixels on the right edge of the map
+    pub fn right(&self) -> i32 {
+        self.x_center + 64 * 2i32.pow(self.scale as u32) - 1
+    }
+
+    /// Z coordinate for pixels on the bottom edge of the map
+    pub fn bottom(&self) -> i32 {
+        self.z_center + 64 * 2i32.pow(self.scale as u32) - 1
+    }
+}
+
+/// Custom debug implementation to avoid printing all 16384 color values
+impl std::fmt::Debug for MapData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        struct ColorsDebug<'a>(&'a ByteArray);
+        impl std::fmt::Debug for ColorsDebug<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "[{} bytes]", self.0.len())
+            }
+        }
+        f.debug_struct("Map Data")
+            .field("scale", &self.scale)
+            .field("dimension", &self.dimension)
+            .field("tracking_position", &self.tracking_position)
+            .field("unlimited_tracking", &self.unlimited_tracking)
+            .field("locked", &self.locked)
+            .field("x_center", &self.x_center)
+            .field("z_center", &self.z_center)
+            .field("banners", &self.banners)
+            .field("frames", &self.frames)
+            .field("colors", &ColorsDebug(&self.colors))
+            .finish()
+    }
+}
+
+/// Content of the map_<#>.dat files
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MapItem {
+    /// Path to map file
+    ///
+    /// **Note:** This is not part of the Minecraft map item and therefore is not serialized.
+    #[serde(skip)]
+    pub file: PathBuf,
+
+    /// The map data
+    pub data: MapData,
+
+    /// The version the map was created
+    #[serde(rename = "DataVersion")]
+    pub data_version: i32,
 }
 
 impl MapItem {
-    pub fn left(&self) -> i32 {
-        self.center.0 - 64 * 2i32.pow(self.scale as u32)
-    }
-
-    pub fn top(&self) -> i32 {
-        self.center.1 - 64 * 2i32.pow(self.scale as u32)
-    }
-
-    pub fn right(&self) -> i32 {
-        self.center.0 + 64 * 2i32.pow(self.scale as u32) - 1
-    }
-
-    pub fn bottom(&self) -> i32 {
-        self.center.1 + 64 * 2i32.pow(self.scale as u32) - 1
-    }
-}
-
-pub struct MinecraftMapper {
-    palette: Palette,
-}
-
-impl MinecraftMapper {
-    pub fn new() -> MinecraftMapper {
-        MinecraftMapper {
-            palette: palette::generate(),
-        }
-    }
-
-    pub fn make_image(&self, map_item: &MapItem) -> Result<RgbaImage> {
+    pub fn make_image(&self, palette: &Palette) -> Result<RgbaImage> {
         let mut image = RgbaImage::new(128, 128);
-        let mut color = map_item.colors.iter();
+        let mut color = self.data.colors.iter();
         for y in 0..128 {
             for x in 0..128 {
                 let c = *color
                     .next()
-                    .ok_or_else(|| Error::invalid_data("Color buffer incomplete"))?
+                    .ok_or_else(|| Error::map_item_error("Color buffer incomplete"))?
                     as u8;
-                let pixel = self.palette.get(&c).unwrap_or(&Rgba([0, 0, 0, 0]));
+                let pixel = palette.get(c as usize).unwrap_or(&Rgba([0, 0, 0, 0]));
                 image.put_pixel(x, y, *pixel);
             }
         }
         Ok(image)
     }
 
-    pub fn read_maps(&self, path: &Path, sort: SortingOrder) -> Result<Vec<MapItem>> {
-        // Make human sorted list of map files
-        let mut map_files = Vec::new();
-        for entry in (path.read_dir()?).flatten() {
-            if entry.path().extension().unwrap_or_default() == "dat"
-                && entry
-                    .path()
+    /// Pretty dimension from file path
+    ///
+    /// This function tries to identify the dimension from the file path.
+    /// Can be useful for same rare cases.  
+    ///
+    /// | Path contains   | Name                           |
+    /// | --------------- | ------------------------------ |
+    /// | _nether         | The Nether                     |
+    /// | _the_end        | The End                        |
+    /// | (none of above) | `self.data.pretty_dimension()` |
+    pub fn pretty_dimension_from_path(&self) -> String {
+        let path = self.file.to_string_lossy();
+        if path.contains("_nether") {
+            String::from("The Nether")
+        } else if path.contains("_the_end") {
+            String::from("The End")
+        } else {
+            self.data.pretty_dimension()
+        }
+    }
+
+    /// Read map item from the given *file* path
+    pub fn read_from(file: &Path) -> Result<MapItem> {
+        let file_reader = File::open(file)?;
+        let decoder = GzDecoder::new(&file_reader);
+        let mut map_item: MapItem = fastnbt::from_reader(decoder)?;
+        map_item.file = PathBuf::from(file);
+        Ok(map_item)
+    }
+
+    /// Write map item to custom location
+    pub fn write_to(&self, file: &Path) -> Result<()> {
+        let file_writer = File::create(file)?;
+        let encoder = GzEncoder::new(file_writer, Compression::default());
+        fastnbt::to_writer(encoder, self)?;
+        Ok(())
+    }
+
+    /// Write map item using its [file](MapItem::file) location
+    pub fn write(&self) -> Result<()> {
+        self.write_to(&self.file)
+    }
+
+    /// Version description
+    ///
+    /// Returns version name from the [MINECRAFT_VERSIONS] table
+    /// or "Unknown" if matching version is not found.
+    pub fn version_description(&self) -> String {
+        MINECRAFT_VERSIONS
+            .get(&self.data_version)
+            .unwrap_or(&"Unknown")
+            .to_string()
+    }
+}
+
+/// A marker
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct Marker {
+    /// Arbitrary unique value for the marker.
+    pub entity_id: i32,
+
+    /// The rotation of the marker, ranging from 0 to 360.
+    pub rotation: i32,
+
+    /// The rotation of the marker, ranging from 0 to 360.
+    pub pos: Pos,
+}
+
+/// Position coordinate in the Minecraft world
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct Pos {
+    /// The x-position
+    pub x: i32,
+
+    /// The y-position
+    pub y: i32,
+
+    /// The z-position
+    pub z: i32,
+}
+
+#[derive(Debug)]
+pub struct ReadMap {
+    map_files: VecDeque<PathBuf>,
+}
+
+impl ReadMap {
+    /// Attempts to find a common base path for all map items
+    pub fn common_base_path(&self) -> Option<PathBuf> {
+        if self.map_files.is_empty() {
+            return None;
+        }
+        let mut iter = self.map_files.iter();
+        let mut base = iter.next().unwrap().clone();
+        for path in iter {
+            let mut new_base = PathBuf::new();
+            let a_components = base.components();
+            let b_components = path.components();
+            let zipped = a_components.zip(b_components);
+            for (a, b) in zipped {
+                if a == b {
+                    new_base.push(a)
+                }
+            }
+            base = new_base;
+        }
+        Some(base)
+    }
+
+    pub fn file_count(&self) -> usize {
+        self.map_files.len()
+    }
+
+    pub fn from_paths(map_files: VecDeque<PathBuf>) -> ReadMap {
+        ReadMap { map_files }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map_files.is_empty()
+    }
+}
+
+impl Iterator for ReadMap {
+    type Item = Result<MapItem>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.map_files
+            .pop_front()
+            .map(|path| MapItem::read_from(&path))
+    }
+}
+
+pub fn read_maps(path: &Path, sort: &Option<SortingOrder>, recursive: bool) -> Result<ReadMap> {
+    let mut directory_stack = VecDeque::new();
+    let mut map_files = VecDeque::new();
+    directory_stack.push_back(PathBuf::from(path));
+    while !directory_stack.is_empty() {
+        let dir = directory_stack.pop_front().unwrap();
+        let read_dir = match dir.read_dir() {
+            Ok(read_dir) => read_dir,
+            Err(err) => {
+                eprintln!("Warning: Could not read: {dir:?}, {err}");
+                continue;
+            }
+        };
+        for dir_entry in read_dir.flatten() {
+            let path = dir_entry.path();
+            if path.is_symlink() {
+                // We do not follow symlinks for now, could cause forever loop
+                continue;
+            } else if path.is_file()
+                && path.extension().unwrap_or_default() == "dat"
+                && path
                     .file_name()
                     .unwrap_or_default()
                     .to_str()
                     .unwrap_or_default()
                     .starts_with("map_")
             {
-                map_files.push(entry.path());
+                map_files.push_back(dir_entry.path());
+            } else if path.is_dir() && recursive {
+                directory_stack.push_back(dir_entry.path());
             }
-        }
-        map_files.sort_by(|a, b| sort.sorting_method(a, b));
-
-        // Load map items
-        let mut maps = Vec::new();
-        for map_file in map_files {
-            if let Ok(map_item) = self.read_map(&map_file) {
-                maps.push(map_item);
-            }
-        }
-
-        if maps.is_empty() {
-            Err(Error::invalid_data("Maps not found"))
-        } else {
-            Ok(maps)
         }
     }
+    if let Some(sort) = sort {
+        map_files.make_contiguous().sort_by(|a, b| sort.cmp(a, b));
+    }
+    Ok(ReadMap { map_files })
+}
 
-    pub fn read_map(&self, file: &Path) -> Result<MapItem> {
-        // Read map file
-        let compressed_data = fs::read(file)?;
+/// Sorting order for map files
+#[derive(Clone, Debug, ValueEnum)]
+pub enum SortingOrder {
+    /// Files are organized by name and numbers in the natural order
+    Name,
 
-        // Uncompress data
-        let mut gz = GzDecoder::new(&compressed_data[..]);
-        let mut uncompressed_data = Vec::new();
-        gz.read_to_end(&mut uncompressed_data)?;
+    /// Files are organized from oldest to newest
+    Time,
+}
 
-        // Read NBT
-        let (nbt, _) = from_binary_slice(&mut uncompressed_data.as_slice())?;
-        if let Value::Compound(data) = nbt
-            .get("data")
-            .ok_or_else(|| Error::invalid_data("data compound not found"))?
-        {
-            let scale = match data.get("scale") {
-                Some(Value::Byte(value)) => value,
-                _ => return Err(Error::invalid_data("Could not read scale")),
-            };
-            let locked = match data.get("locked") {
-                Some(Value::Byte(value)) => value,
-                _ => return Err(Error::invalid_data("Could not read locked")),
-            };
-            let x_center = match data.get("xCenter") {
-                Some(Value::Int(value)) => value,
-                _ => return Err(Error::invalid_data("Could not read xCenter")),
-            };
-            let z_center = match data.get("zCenter") {
-                Some(Value::Int(value)) => value,
-                _ => return Err(Error::invalid_data("Could not read zCenter")),
-            };
-            let dimension = match data.get("dimension") {
-                Some(Value::String(value)) => value,
-                _ => return Err(Error::invalid_data("Could not read dimension")),
-            };
-            let colors = match data.get("colors") {
-                Some(Value::ByteArray(value)) => value,
-                _ => return Err(Error::invalid_data("Could not read colors")),
-            };
-
-            return Ok(MapItem {
-                file: PathBuf::from(file),
-                scale: scale.to_owned(),
-                dimension: dimension.to_owned(),
-                locked: *locked != 0,
-                center: (*x_center, *z_center),
-                colors: colors.to_owned(),
-            });
+impl SortingOrder {
+    /// This method returns an Ordering between *a* and *b* path based on *self* value.
+    pub fn cmp(&self, a: &Path, b: &Path) -> Ordering {
+        match self {
+            SortingOrder::Name => {
+                let a_str = a.as_os_str().to_str().expect("invalid path");
+                let b_str = b.as_os_str().to_str().expect("invalid path");
+                natord::compare(a_str, b_str)
+            }
+            SortingOrder::Time => {
+                let a_modified = &a
+                    .metadata()
+                    .expect("could not read metadata")
+                    .modified()
+                    .expect("could not get modification time");
+                let b_modified = &b
+                    .metadata()
+                    .expect("could not read metadata")
+                    .modified()
+                    .expect("could not get modification time");
+                a_modified.cmp(b_modified)
+            }
         }
-
-        Err(Error::invalid_data(
-            "This file did not have known Minecraft map item",
-        ))
     }
 }
 
-impl Default for MinecraftMapper {
-    fn default() -> Self {
-        Self::new()
+#[cfg(test)]
+mod tests {
+    use crate::palette::{generate_palette, BASE_COLORS_2699};
+    use crate::MapItem;
+    use image::{GenericImageView, Pixel};
+    use std::collections::BTreeMap;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn test_make_image() {
+        let map_item = MapItem::read_from(&project_file(&Path::new("tests/map_0.dat"))).unwrap();
+        let map_image = map_item
+            .make_image(&generate_palette(&BASE_COLORS_2699))
+            .unwrap();
+        let reference_image = image::open(&project_file(&Path::new("tests/map_0.png"))).unwrap();
+        assert_eq!(map_image.dimensions(), reference_image.dimensions());
+
+        // Comparing each pixel and collecting wrong colors to map
+        let mut wrong_colors = BTreeMap::new();
+        for y in 0..128 {
+            for x in 0..128 {
+                let map_pixel = *map_image.get_pixel(x, y);
+                let reference_pixel = reference_image.get_pixel(x, y);
+                if map_pixel != reference_pixel {
+                    // Find the color value that is wrong
+                    let color = *map_item.data.colors.get((y * 128 + x) as usize).unwrap();
+                    wrong_colors
+                        .entry(color as u8)
+                        .or_insert((map_pixel, reference_pixel));
+                }
+            }
+        }
+
+        // Panic if wrong colors is not empty
+        if !wrong_colors.is_empty() {
+            // Formatting errors for easy to read format
+            let mut wrong_colors_message = format!(
+                "{:<8}#{:<12}#{:<12}\n",
+                "Color", "What it is", "What it should be"
+            );
+            for (color, (left, right)) in wrong_colors {
+                wrong_colors_message.push_str(&format!(
+                    "{:<8}#{:<12}#{:<12}\n",
+                    color,
+                    hex::encode(left.channels()),
+                    hex::encode(right.channels())
+                ))
+            }
+            panic!("{}", wrong_colors_message);
+        }
+    }
+
+    fn project_file(path: &Path) -> PathBuf {
+        let mut relative_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        relative_path.push(path);
+        relative_path
     }
 }

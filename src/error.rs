@@ -8,20 +8,25 @@ impl Error {
         Error(Box::new(kind))
     }
 
-    pub fn invalid_data(msg: &str) -> Error {
-        Error(Box::new(ErrorKind::InvalidData(String::from(msg))))
+    pub fn map_item_error(message: &'static str) -> Error {
+        Self::new(ErrorKind::MapItemError(message))
     }
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self.0 {
+            ErrorKind::FastNbtError(ref err) => err.fmt(f),
             ErrorKind::ImageError(ref err) => err.fmt(f),
-            ErrorKind::InvalidData(ref err) => err.fmt(f),
             ErrorKind::IoError(ref err) => err.fmt(f),
-            ErrorKind::Message(ref err) => err.fmt(f),
-            ErrorKind::NbtError(ref err) => err.fmt(f),
+            ErrorKind::MapItemError(message) => message.fmt(f),
         }
+    }
+}
+
+impl From<fastnbt::error::Error> for Error {
+    fn from(err: fastnbt::error::Error) -> Self {
+        Error::new(ErrorKind::FastNbtError(err))
     }
 }
 
@@ -31,29 +36,16 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<valence_nbt::Error> for Error {
-    fn from(err: valence_nbt::Error) -> Self {
-        Error::new(ErrorKind::NbtError(err))
-    }
-}
-
 impl From<image::ImageError> for Error {
     fn from(err: image::ImageError) -> Self {
         Error::new(ErrorKind::ImageError(err))
     }
 }
 
-impl From<String> for Error {
-    fn from(message: String) -> Self {
-        Error::new(ErrorKind::Message(message))
-    }
-}
-
 #[derive(Debug)]
 pub enum ErrorKind {
+    FastNbtError(fastnbt::error::Error),
     ImageError(image::ImageError),
-    InvalidData(String),
     IoError(std::io::Error),
-    Message(String),
-    NbtError(valence_nbt::Error),
+    MapItemError(&'static str),
 }
