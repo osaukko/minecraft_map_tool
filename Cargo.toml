@@ -2,9 +2,11 @@
 authors = ["Ossi Saukko <osaukko@gmail.com>"]
 description = "Utility for handling Minecraft map files"
 edition = "2021"
-license-file = "LICENSE"
+homepage = "https://github.com/osaukko/minecraft_map_tool"
+license = "MIT"
 name = "minecraft_map_tool"
 publish = false
+repository = "https://github.com/osaukko/minecraft_map_tool"
 version = "0.2.0"
 
 [dependencies]

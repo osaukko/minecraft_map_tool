@@ -3,7 +3,7 @@ use phf::{phf_map, Map};
 /// Mapping data versions to known client versions
 ///
 /// The table was made from the content available at
-/// [https://minecraft.fandom.com/wiki/Data_version](https://minecraft.fandom.com/wiki/Data_version#List_of_data_versions)
+/// [https://minecraft.wiki/w/Data_version](https://minecraft.wiki/w/Data_version)
 pub const MINECRAFT_VERSIONS: Map<i32, &'static str> = phf_map! {
     100i32 => "Java Edition 15w32a",
     103i32 => "Java Edition 15w32b",
@@ -499,4 +499,22 @@ pub const MINECRAFT_VERSIONS: Map<i32, &'static str> = phf_map! {
     3576i32 => "Java Edition 1.20.2 Release Candidate 1",
     3577i32 => "Java Edition 1.20.2 Release Candidate 2",
     3578i32 => "Java Edition 1.20.2",
+    3679i32 => "Java Edition 23w40a",
+    3681i32 => "Java Edition 23w41a",
+    3684i32 => "Java Edition 23w42a",
+    3686i32 => "Java Edition 23w43a",
+    3687i32 => "Java Edition 23w43b",
+    3688i32 => "Java Edition 23w44a",
+    3690i32 => "Java Edition 23w45a",
+    3691i32 => "Java Edition 23w46a",
+    3693i32 => "Java Edition 1.20.3 Pre-Release 1",
+    3694i32 => "Java Edition 1.20.3 Pre-Release 2",
+    3695i32 => "Java Edition 1.20.3 Pre-Release 3",
+    3696i32 => "Java Edition 1.20.3 Pre-Release 4",
+    3697i32 => "Java Edition 1.20.3 Release Candidate 1",
+    3698i32 => "Java Edition 1.20.3",
+    3699i32 => "Java Edition 1.20.4 Release Candidate 1",
+    3700i32 => "Java Edition 1.20.4",
+    3801i32 => "Java Edition 23w51a",
+    3802i32 => "Java Edition 23w51b",
 };

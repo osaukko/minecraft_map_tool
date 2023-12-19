@@ -5,6 +5,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use minecraft_map_tool::palette::{generate_palette, BASE_COLORS_2699};
 use minecraft_map_tool::{read_maps, ReadMap, SortingOrder};
 use std::collections::VecDeque;
+use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Duration;
@@ -229,6 +230,9 @@ fn make_image(project: ImageProject) -> Result<RgbaImage> {
 }
 
 fn process(args: &StitchingArgs) -> Result<()> {
+    if let Some(output_path) = PathBuf::from(&args.filename).parent() {
+        fs::create_dir_all(output_path)?;
+    }
     let project = prepare(args)?;
     let image = make_image(project)?;
     let progress_bar = ProgressBar::new_spinner();

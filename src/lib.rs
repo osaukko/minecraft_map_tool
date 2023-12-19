@@ -74,12 +74,20 @@ impl Banner {
     ///
     /// If name parsing from JSON fails, then error message is returned as name
     pub fn extract_name(&self) -> String {
-        match &self.name {
-            None => "[nameless]".to_string(),
-            Some(json) => match serde_json::from_str::<BannerName>(json) {
-                Ok(banner_name) => banner_name.text,
-                Err(error) => error.to_string(),
-            },
+        let json = match &self.name {
+            None => return "[nameless]".to_string(),
+            Some(json) => json,
+        };
+
+        // Try to deserialize from BannerName JSON format
+        if let Ok(banner_name) = serde_json::from_str::<BannerName>(json) {
+            return banner_name.text;
+        }
+
+        // Try to deserialize as plain string
+        match serde_json::from_str::<String>(json) {
+            Ok(banner_name) => banner_name,
+            Err(error) => error.to_string(),
         }
     }
 }
