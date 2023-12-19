@@ -10,7 +10,7 @@ With luck, this program will also be helpful for others. Please note that the pr
 
 In command examples, `$` indicates the input of the command prompt. It is followed by a command that you can type. Note that you do not type the `$`, only the command after it. Lines without the `$` sign are the example output of the program.
 
-Some long lines are split into multiple lines with backslash `\`. You do not need to write them. You can write the whole command in one go without new lines.
+Some long lines are split into multiple lines with backslash `\`. You can write the whole command in one go without new lines and backslashes.
 
 ## Build
 
@@ -264,5 +264,6 @@ Map area for image
   Lower Right : 1471 191
   Size        : 1920×1920
 Making image with size: 1920×1920
-  Drawing maps [████████████████████████████████████████] 655/655 (0s)                                                             Saving image as "images/example.png"   
+  Drawing maps [████████████████████████████████████████] 655/655 (0s)
+  Saving image as "images/example.png"   
 ```
