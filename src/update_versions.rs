@@ -1,6 +1,7 @@
 use clap::{arg, Args};
 use quick_xml::events::Event;
 use quick_xml::Reader;
+use reqwest::blocking::ClientBuilder;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::fs;
@@ -14,7 +15,7 @@ pub struct UpdateVersionsArgs {
         short,
         long,
         value_name = "URL",
-        default_value = "https://minecraft.fandom.com/wiki/Data_version"
+        default_value = "https://minecraft.wiki/w/Data_version"
     )]
     source_url: String,
 
@@ -88,9 +89,10 @@ pub fn run(args: &UpdateVersionsArgs) -> ExitCode {
 /// Mapping data versions to known client versions
 ///
 /// The table was made from the content available at
-/// [https://minecraft.fandom.com/wiki/Data_version](https://minecraft.fandom.com/wiki/Data_version#List_of_data_versions)
+/// [https://minecraft.wiki/w/Data_version](https://minecraft.wiki/w/Data_version#List_of_data_versions)
 pub const MINECRAFT_VERSIONS: Map<i32, &'static str> = phf_map! {
-"#.to_string();
+"#
+    .to_string();
     for (data_version, client_version) in versions_tree {
         versions_code.push_str(&format!("    {data_version}i32 => \"{client_version}\",\n"));
     }
@@ -116,7 +118,12 @@ where
 }
 
 fn load(url: &str) -> Result<String, String> {
-    let response = reqwest::blocking::get(url).map_err(err_to_string)?;
+    static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+    let client = ClientBuilder::new()
+        .user_agent(APP_USER_AGENT)
+        .build()
+        .map_err(err_to_string)?;
+    let response = client.get(url).send().map_err(err_to_string)?;
     response.text().map_err(err_to_string)
 }
 
@@ -133,7 +140,6 @@ fn find_version_table(body: &str) -> Result<&str, &str> {
         None => return Err("Could not find end of the versions table"),
         Some(pos) => start_pos + pos + 8,
     };
-
     Ok(&body[start_pos..end_pos])
 }
 
@@ -150,7 +156,7 @@ struct TableRow {
 impl TableRow {
     fn new() -> TableRow {
         TableRow {
-            cells: vec![TableCell::new(), TableCell::new(), TableCell::new()],
+            cells: vec![TableCell::new(), TableCell::new()],
         }
     }
 
@@ -166,7 +172,7 @@ impl TableRow {
             return Err("Client version is empty");
         }
         let client_version = self.cells[0].text.clone();
-        let data_version = self.cells[2]
+        let data_version = self.cells[1]
             .text
             .parse::<i32>()
             .map_err(|_| "Could not parse data version")?;
@@ -215,7 +221,7 @@ impl TableCell {
                                 let attribute = attribute_result.map_err(err_to_string)?;
                                 if attribute.key.as_ref() == b"rowspan" {
                                     self.rowspan = attribute
-                                        .decode_and_unescape_value(reader)
+                                        .decode_and_unescape_value(reader.decoder())
                                         .map_err(err_to_string)?
                                         .parse::<u32>()
                                         .map_err(err_to_string)?

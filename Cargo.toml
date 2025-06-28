@@ -9,45 +9,45 @@ publish = false
 repository = "https://github.com/osaukko/minecraft_map_tool"
 version = "0.2.0"
 
-[dependencies]
-anyhow = "1.0.75"
-comfy-table = "7.1"
-crossterm = "0.27"
-fastnbt = "2.4"
-flate2 = "1.0"
-heck = "0.4"
-image = "0.24"
-indicatif = "0.17.7"
-natord = "1.0"
-serde_json = "1.0"
-viuer = "0.7"
-
-[dependencies.clap]
-features = ["derive"]
-version = "4.4"
-
-[dependencies.phf]
-features = ["macros"]
-version = "0.11"
-
-[dependencies.quick-xml]
-version = "0.31"
-optional = true
-
-[dependencies.reqwest]
-version = "0.11"
-features = ["blocking"]
-optional = true
-
-[dependencies.serde]
-features = ["derive"]
-version = "1.0"
-
-[dev-dependencies]
-hex = "0.4"
-
 [features]
 # This will add subcommands for the development.
 dev_tools = ["quick-xml", "reqwest"]
 # This will add support for sixel protocol to display maps to the terminal.
 sixel = ["viuer/sixel"]
+
+[dependencies]
+anyhow = "1.0.98"
+comfy-table = "7.1.4"
+crossterm = "0.29.0"
+fastnbt = "2.5.0"
+flate2 = "1.1.2"
+heck = "0.5.0"
+image = "0.25.6"
+indicatif = "0.17.11"
+natord = "1.0.9"
+serde_json = "1.0.140"
+viuer = "0.9.2"
+
+[dependencies.clap]
+features = ["derive"]
+version = "4.5.40"
+
+[dependencies.phf]
+features = ["macros"]
+version = "0.12.1"
+
+[dependencies.quick-xml]
+version = "0.37.5"
+optional = true
+
+[dependencies.reqwest]
+version = "0.12.20"
+features = ["blocking"]
+optional = true
+
+[dependencies.serde]
+features = ["derive"]
+version = "1.0.219"
+
+[dev-dependencies]
+hex = "0.4.3"
