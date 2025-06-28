@@ -11,7 +11,7 @@ version = "0.2.0"
 
 [features]
 # This will add subcommands for the development.
-dev_tools = ["quick-xml", "reqwest"]
+dev_tools = ["ptree", "quick-xml", "reqwest"]
 # This will add support for sixel protocol to display maps to the terminal.
 sixel = ["viuer/sixel"]
 
@@ -35,6 +35,10 @@ version = "4.5.40"
 [dependencies.phf]
 features = ["macros"]
 version = "0.12.1"
+
+[dependencies.ptree]
+version = "0.5.2"
+optional = true
 
 [dependencies.quick-xml]
 version = "0.37.5"

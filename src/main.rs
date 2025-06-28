@@ -11,6 +11,8 @@ mod stitching_tool;
 mod test_map;
 
 #[cfg(feature = "dev_tools")]
+mod dump_nbt;
+#[cfg(feature = "dev_tools")]
 mod update_versions;
 
 #[derive(Debug, Parser)]
@@ -61,6 +63,10 @@ enum Commands {
     /// the Minecraft Wiki and update the versions source file.
     #[cfg(feature = "dev_tools")]
     UpdateVersions(update_versions::UpdateVersionsArgs),
+
+    /// Show the hierarchical structure of an NBT file
+    #[cfg(feature = "dev_tools")]
+    DumpNbt(dump_nbt::DumpNbtArgs),
 }
 
 impl Commands {
@@ -79,6 +85,9 @@ impl Commands {
 
             #[cfg(feature = "dev_tools")]
             Commands::UpdateVersions(args) => update_versions::run(args),
+
+            #[cfg(feature = "dev_tools")]
+            Commands::DumpNbt(args) => dump_nbt::run(args),
         }
     }
 }
