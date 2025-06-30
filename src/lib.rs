@@ -19,7 +19,7 @@ pub mod palette;
 pub mod versions;
 
 /// Banner color options
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BannerColor {
     Black,
@@ -85,10 +85,7 @@ impl Banner {
         }
 
         // Try to deserialize as plain string
-        match serde_json::from_str::<String>(json) {
-            Ok(banner_name) => banner_name,
-            Err(error) => error.to_string(),
-        }
+        serde_json::from_str::<String>(json).unwrap_or_else(|error| error.to_string())
     }
 }
 
@@ -298,7 +295,7 @@ pub struct Marker {
 }
 
 /// Position coordinate in the Minecraft world
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Pos {
     /// The x-position
@@ -383,11 +380,11 @@ pub fn read_maps(path: &Path, sort: &Option<SortingOrder>, recursive: bool) -> R
             } else if path.is_file()
                 && path.extension().unwrap_or_default() == "dat"
                 && path
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_str()
-                    .unwrap_or_default()
-                    .starts_with("map_")
+                .file_name()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default()
+                .starts_with("map_")
             {
                 map_files.push_back(dir_entry.path());
             } else if path.is_dir() && recursive {
@@ -440,18 +437,75 @@ impl SortingOrder {
 #[cfg(test)]
 mod tests {
     use crate::palette::{generate_palette, BASE_COLORS_2699};
-    use crate::MapItem;
+    use crate::{BannerColor, MapItem, Pos};
     use image::{GenericImageView, Pixel};
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
+    use test_case::test_case;
+
+    fn project_file<P: AsRef<Path>>(path: P) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(path)
+    }
+
+    #[test_case(3463; "Java Edition 1.20")]
+    #[test_case(3465; "Java Edition 1.20.1")]
+    #[test_case(3578; "Java Edition 1.20.2")]
+    #[test_case(3698; "Java Edition 1.20.3")]
+    #[test_case(3700; "Java Edition 1.20.4")]
+    #[test_case(3837; "Java Edition 1.20.5")]
+    #[test_case(3839; "Java Edition 1.20.6")]
+    #[test_case(3953; "Java Edition 1.21")]
+    #[test_case(3955; "Java Edition 1.21.1")]
+    #[test_case(4080; "Java Edition 1.21.2")]
+    #[test_case(4082; "Java Edition 1.21.3")]
+    #[test_case(4189; "Java Edition 1.21.4")]
+    #[test_case(4325; "Java Edition 1.21.5")]
+    #[test_case(4435; "Java Edition 1.21.6")]
+    fn test_map_versions(data_version: i32) {
+        // Load the map data from the test file corresponding to the given data version.
+        let map_item = MapItem::read_from(&project_file(&format!("tests/{}_map.dat", data_version))).unwrap();
+
+        // Verify that the loaded map's data version matches the expected one.
+        assert_eq!(map_item.data_version, data_version);
+
+        // Confirm exactly two banners exist in the test data, with expected colors, positions, and names.
+        assert_eq!(map_item.data.banners.len(), 2);
+        assert_eq!(map_item.data.banners[0].color, BannerColor::White);
+        assert_eq!(map_item.data.banners[1].color, BannerColor::Lime);
+        assert_eq!(map_item.data.banners[0].pos, Pos { x: -9, y: 110, z: 5 });
+        assert_eq!(map_item.data.banners[1].pos, Pos { x: 14, y: 111, z: 5 });
+        assert_eq!(map_item.data.banners[0].extract_name(), "Hello");
+        assert_eq!(map_item.data.banners[1].extract_name(), "World");
+
+        // Colors are not verified here — see `test_make_image` for color tests.
+
+        // Confirm the map dimension matches the expected dimension string.
+        assert_eq!(map_item.data.dimension, "minecraft:overworld");
+
+        // Verify there are two frames with expected positions and rotations.
+        // Entity IDs vary across versions and are not checked here.
+        assert_eq!(map_item.data.frames.len(), 2);
+        assert_eq!(map_item.data.frames[0].pos, Pos { x: 1, y: 110, z: -34 });
+        assert_eq!(map_item.data.frames[1].pos, Pos { x: -30, y: 113, z: 1 });
+        assert_eq!(map_item.data.frames[0].rotation, 180);
+        assert_eq!(map_item.data.frames[1].rotation, 270);
+
+        // Verify map configuration parameters match expected.
+        assert_eq!(map_item.data.locked, 0);
+        assert_eq!(map_item.data.scale, 0);
+        assert_eq!(map_item.data.tracking_position, 1);
+        assert_eq!(map_item.data.unlimited_tracking, 0);
+        assert_eq!(map_item.data.x_center, 0);
+        assert_eq!(map_item.data.z_center, 0);
+    }
 
     #[test]
     fn test_make_image() {
-        let map_item = MapItem::read_from(&project_file(&Path::new("tests/map_0.dat"))).unwrap();
+        let map_item = MapItem::read_from(&project_file("tests/map_0.dat")).unwrap();
         let map_image = map_item
             .make_image(&generate_palette(&BASE_COLORS_2699))
             .unwrap();
-        let reference_image = image::open(&project_file(&Path::new("tests/map_0.png"))).unwrap();
+        let reference_image = image::open(&project_file("tests/map_0.png")).unwrap();
         assert_eq!(map_image.dimensions(), reference_image.dimensions());
 
         // Comparing each pixel and collecting wrong colors to map
@@ -487,11 +541,5 @@ mod tests {
             }
             panic!("{}", wrong_colors_message);
         }
-    }
-
-    fn project_file(path: &Path) -> PathBuf {
-        let mut relative_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        relative_path.push(path);
-        relative_path
     }
 }
