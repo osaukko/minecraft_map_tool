@@ -1,12 +1,13 @@
 use crate::error::{Error, Result};
 use crate::palette::Palette;
 use crate::versions::MINECRAFT_VERSIONS;
+use anyhow::anyhow;
 use clap::ValueEnum;
 use fastnbt::ByteArray;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use heck::ToTitleCase;
 use image::{Rgba, RgbaImage};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     cmp::Ordering,
     collections::VecDeque,
@@ -40,6 +41,12 @@ pub enum BannerColor {
     Yellow,
 }
 
+impl Default for BannerColor {
+    fn default() -> Self {
+        Self::White
+    }
+}
+
 impl std::fmt::Display for BannerColor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self:?}")
@@ -54,15 +61,18 @@ struct BannerName {
 
 /// A banner marker
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "snake_case")]
 pub struct Banner {
     /// The color of the banner.
+    #[serde(alias = "Color", default)]
     pub color: BannerColor,
 
     /// The custom name of the banner, in JSON text. May not exist.
+    #[serde(alias = "Name")]
     pub name: Option<String>,
 
     /// The block position of the banner in the world.
+    #[serde(alias = "Pos")]
     pub pos: Pos,
 }
 
@@ -76,7 +86,7 @@ impl Banner {
     pub fn extract_name(&self) -> String {
         let json = match &self.name {
             None => return "[nameless]".to_string(),
-            Some(json) => json,
+            Some(name_text) => name_text,
         };
 
         // Try to deserialize from BannerName JSON format
@@ -84,8 +94,13 @@ impl Banner {
             return banner_name.text;
         }
 
-        // Try to deserialize as plain string
-        serde_json::from_str::<String>(json).unwrap_or_else(|error| error.to_string())
+        // Try to deserialize as plain JSON string
+        if let Ok(name) = serde_json::from_str::<String>(json) {
+            return name;
+        }
+
+        // Return text as it is
+        json.to_owned()
     }
 }
 
@@ -95,6 +110,7 @@ impl Banner {
 pub struct MapData {
     /// How zoomed in the map is (it is in 2<sup>scale</sup> wide blocks square per pixel,
     /// even for 0, where the map is 1:1). Minimum 0 and maximum 4.
+    #[serde(default)]
     pub scale: i8,
 
     /// For <1.16 (byte): 0 = The Overworld, -1 = The Nether, 1 = The End,
@@ -104,14 +120,17 @@ pub struct MapData {
 
     /// 1 indicates that a positional arrow should be shown when the map is near its
     /// center coords. 0 indicates that the position arrow should never be shown.
+    #[serde(default = "default_tracking_position")]
     pub tracking_position: i8,
 
     /// 1 allows the player position indicator to show as a smaller dot on the map's edge when the
     /// player is farther than 320 * (scale+1) blocks from the map's center. 0 makes the dot instead
     /// disappear when the player is farther than this distance.
+    #[serde(default)]
     pub unlimited_tracking: i8,
 
     /// 1 if the map has been locked in a cartography table.
+    #[serde(default)]
     pub locked: i8,
 
     /// Center of map according to real world by X.
@@ -129,6 +148,8 @@ pub struct MapData {
     /// Width * Height array of color values (16384 entries for a default 128×128 map).
     pub colors: ByteArray,
 }
+
+fn default_tracking_position() -> i8 { 1 }
 
 impl MapData {
     /// Scale description in format of 1:1, 1:2, etc.
@@ -282,21 +303,23 @@ impl MapItem {
 
 /// A marker
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "snake_case")]
 pub struct Marker {
     /// Arbitrary unique value for the marker.
+    #[serde(alias = "EntityId")]
     pub entity_id: i32,
 
     /// The rotation of the marker, ranging from 0 to 360.
+    #[serde(alias = "Rotation")]
     pub rotation: i32,
 
     /// The rotation of the marker, ranging from 0 to 360.
+    #[serde(alias = "Pos")]
     pub pos: Pos,
 }
 
 /// Position coordinate in the Minecraft world
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct Pos {
     /// The x-position
     pub x: i32,
@@ -306,6 +329,41 @@ pub struct Pos {
 
     /// The z-position
     pub z: i32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+enum PosFormats {
+    #[serde(rename_all = "PascalCase")]
+    Compound { x: i32, y: i32, z: i32 },
+    IntArray(fastnbt::IntArray),
+}
+
+impl TryFrom<PosFormats> for Pos {
+    type Error = anyhow::Error;
+
+    fn try_from(value: PosFormats) -> std::result::Result<Self, Self::Error> {
+        match value {
+            PosFormats::Compound { x, y, z } => Ok(Pos { x, y, z }),
+            PosFormats::IntArray(array) => {
+                if array.len() != 3 {
+                    Err(anyhow!("Expected an array of 3 integers for position [x, y, z], but got {} elements.", array.len()))
+                } else {
+                    Ok(Pos { x: array[0], y: array[1], z: array[2] })
+                }
+            }
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Pos {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let pos = PosFormats::deserialize(deserializer)?;
+        pos.try_into().map_err(serde::de::Error::custom)
+    }
 }
 
 #[derive(Debug)]
