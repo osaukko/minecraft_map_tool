@@ -55,3 +55,4 @@ version = "1.0.219"
 
 [dev-dependencies]
 hex = "0.4.3"
+test-case = "3.3.1"
