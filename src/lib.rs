@@ -140,9 +140,11 @@ pub struct MapData {
     pub z_center: i32,
 
     /// List of banner markers added to this map. May be empty.
+    #[serde(default)]
     pub banners: Vec<Banner>,
 
     /// List map markers added to this map. May be empty.
+    #[serde(default)]
     pub frames: Vec<Marker>,
 
     /// Width * Height array of color values (16384 entries for a default 128×128 map).
@@ -519,6 +521,8 @@ mod tests {
     #[test_case(4189; "Java Edition 1.21.4")]
     #[test_case(4325; "Java Edition 1.21.5")]
     #[test_case(4435; "Java Edition 1.21.6")]
+    #[test_case(4438; "Java Edition 1.21.7")]
+    #[test_case(4440; "Java Edition 1.21.8")]
     fn test_map_versions(data_version: i32) {
         // Load the map data from the test file corresponding to the given data version.
         let map_item = MapItem::read_from(&project_file(&format!("tests/{}_map.dat", data_version))).unwrap();
@@ -549,6 +553,34 @@ mod tests {
         assert_eq!(map_item.data.frames[1].rotation, 270);
 
         // Verify map configuration parameters match expected.
+        assert_eq!(map_item.data.locked, 0);
+        assert_eq!(map_item.data.scale, 0);
+        assert_eq!(map_item.data.tracking_position, 1);
+        assert_eq!(map_item.data.unlimited_tracking, 0);
+        assert_eq!(map_item.data.x_center, 0);
+        assert_eq!(map_item.data.z_center, 0);
+    }
+
+    #[test]
+    fn test_just_a_map() {
+        // Load a minimal map from the test data file.
+        let map_item = MapItem::read_from(&project_file("tests/just_a_map.dat")).unwrap();
+
+        // Check that the data version matches the expected version.
+        assert_eq!(map_item.data_version, 4440);
+
+        // Confirm that there are no banners in the map data.
+        assert_eq!(map_item.data.banners.len(), 0);
+
+        // Note: Banner colors are not tested here — see `test_make_image` for color tests.
+
+        // Confirm that the map's dimension matches the expected value.
+        assert_eq!(map_item.data.dimension, "minecraft:overworld");
+
+        // Confirm that there are no frames in the map data.
+        assert_eq!(map_item.data.frames.len(), 0);
+
+        // Verify basic map configuration values.
         assert_eq!(map_item.data.locked, 0);
         assert_eq!(map_item.data.scale, 0);
         assert_eq!(map_item.data.tracking_position, 1);
